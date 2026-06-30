@@ -147,10 +147,11 @@ Pick **one** option.
 [Azure Portal](https://portal.azure.com) → *Create Static Web App* → choose
 **GitHub** as the source and select your fork → build preset **Blazor**, app
 location `Client`, api location `Api`, output location `wwwroot`. Azure adds the
-deployment-token secret to your repo and commits a workflow
-(`.github/workflows/azure-static-web-apps.yml`). From then on, **every push to
-`main` builds the Client + Api and deploys** — Azure's build pipeline handles the
-full .NET publish for you.
+deployment-token secret to your repo and commits a workflow named after the app
+(`.github/workflows/azure-static-web-apps-<name>.yml`), wired to your repo's
+default branch. From then on, **every push to that branch builds the Client + Api
+and deploys** — Azure's build pipeline handles the full .NET publish for you. Let
+Azure own this file; don't add your own alongside it or you'll get double deploys.
 
 **Option B — Deploy from your machine (no fork/Actions needed).** Create a
 standalone app, then publish and push the build with the SWA CLI:
