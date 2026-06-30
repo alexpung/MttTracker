@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace MttTracker.Api;
 
@@ -9,7 +10,7 @@ namespace MttTracker.Api;
 /// site, but the API independently verifies the principal so that even another
 /// authenticated GitHub user cannot read or write data.
 /// </summary>
-public sealed class RequestAuthorizer(IConfiguration config)
+public sealed class RequestAuthorizer(IConfiguration config, ILogger<RequestAuthorizer> logger)
 {
     private readonly string? _allowedUserDetails = config["AllowedUserDetails"];
     private readonly string? _allowedUserId = config["AllowedUserId"];
@@ -26,11 +27,24 @@ public sealed class RequestAuthorizer(IConfiguration config)
         var principal = ClientPrincipal.FromRequest(request);
         if (principal is null || !principal.IsAuthenticated || string.IsNullOrEmpty(principal.UserId))
         {
+            logger.LogWarning(
+                "Authorize -> Unauthenticated. principalPresent={Present} authenticated={Auth} hasUserId={HasId}",
+                principal is not null,
+                principal?.IsAuthenticated ?? false,
+                !string.IsNullOrEmpty(principal?.UserId));
             return Result.Unauthenticated;
         }
 
         if (!IsAllowed(principal))
         {
+            // Log exactly what the API saw vs what's allow-listed, so an
+            // intermittent deny for a valid user is diagnosable.
+            logger.LogWarning(
+                "Authorize -> Forbidden. provider={Provider} userId={UserId} userDetails={UserDetails} " +
+                "allowIdConfigured={ById} allowDetailsConfigured={ByDetails}",
+                principal.IdentityProvider, principal.UserId, principal.UserDetails,
+                !string.IsNullOrWhiteSpace(_allowedUserId),
+                !string.IsNullOrWhiteSpace(_allowedUserDetails));
             return Result.Forbidden;
         }
 
