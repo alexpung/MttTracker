@@ -15,6 +15,7 @@
     { "route": "/.auth/login/twitter", "statusCode": 404 },
     { "route": "/.auth/login/google", "statusCode": 404 },
     { "route": "/.auth/login/facebook", "statusCode": 404 },
+    { "route": "/logged-out.html", "allowedRoles": ["anonymous", "authenticated"] },
     { "route": "/api/*", "allowedRoles": ["authenticated"] },
     { "route": "/*", "allowedRoles": ["authenticated"] }
   ],

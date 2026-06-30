@@ -16,9 +16,10 @@
 @if (notAuthorized)
 {
     <div class="alert alert-warning">
-        <strong>Not authorized.</strong> You're signed in, but this account isn't
-        allowed to use this app. <a href="/.auth/logout">Sign out</a> and sign in
-        with the owner's GitHub account.
+        <strong>Not authorized.</strong> You're signed in with a GitHub account that
+        isn't allowed to use this app.
+        <a href="/.auth/logout?post_logout_redirect_uri=/logged-out.html">Sign out</a> —
+        then, to switch accounts, also sign out of GitHub before signing back in.
     </div>
 }
 else if (loadError)
