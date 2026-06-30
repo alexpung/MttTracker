@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Azure Functions local settings (contains connection strings / keys)
+local.settings.json
+
+# Static Web Apps CLI
+.swa/

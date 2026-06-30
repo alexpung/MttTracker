@@ -1,0 +1,13 @@
+@inject NavigationManager Navigation
+
+@code {
+    // Send unauthenticated visitors to the Static Web Apps GitHub login,
+    // returning them to the page they originally requested.
+    protected override void OnInitialized()
+    {
+        var returnUrl = Uri.EscapeDataString(Navigation.Uri);
+        Navigation.NavigateTo(
+            $"/.auth/login/github?post_login_redirect_uri={returnUrl}",
+            forceLoad: true);
+    }
+}

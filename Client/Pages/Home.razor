@@ -1,0 +1,134 @@
+@page "/"
+@attribute [Authorize]
+@inject TournamentService Tournaments
+
+<PageTitle>Dashboard</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">Dashboard</h1>
+    <a class="btn btn-primary" href="entries">Add tournament</a>
+</div>
+
+@if (notAuthorized)
+{
+    <div class="alert alert-warning">
+        <strong>Not authorized.</strong> You're signed in, but this account isn't
+        allowed to use this app. <a href="/.auth/logout">Sign out</a> and sign in
+        with the owner's GitHub account.
+    </div>
+}
+else if (loadError)
+{
+    <div class="alert alert-danger">
+        Couldn't load your data. <button class="btn btn-sm btn-outline-danger ms-2" @onclick="ReloadAsync">Retry</button>
+    </div>
+}
+else if (stats is null)
+{
+    <p>Loading…</p>
+}
+else if (stats.TournamentCount == 0)
+{
+    <div class="alert alert-info">
+        No tournaments recorded yet. <a href="entries">Add your first one</a> to start tracking your P&amp;L.
+    </div>
+}
+else
+{
+    <div class="row g-3 mb-4">
+        @StatCard("Net profit", Format.Money(stats.NetProfit), Format.SignClass(stats.NetProfit))
+        @StatCard("ROI", Format.Percent(stats.Roi), Format.SignClass((decimal)stats.Roi))
+        @StatCard("Total buy-in", Format.Money(stats.TotalBuyin))
+        @StatCard("Total cashes", Format.Money(stats.TotalCashes))
+        @StatCard("Entries", $"{stats.TotalEntries}", subtitle: $"{stats.TournamentCount} tournaments")
+        @StatCard("Cashed", $"{stats.CashCount}", subtitle: InTheMoney())
+        @StatCard("Avg buy-in", Format.Money2(stats.AverageBuyin))
+        @StatCard("Avg profit / event", Format.Money2(stats.AverageProfit), Format.SignClass(stats.AverageProfit))
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Cumulative profit / loss</div>
+        <div class="card-body">
+            <PnlChart Points="stats.Pnl" />
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Profit by year</div>
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Year</th>
+                        <th class="text-end">Entries</th>
+                        <th class="text-end">Buy-in</th>
+                        <th class="text-end">Cashes</th>
+                        <th class="text-end">Profit</th>
+                        <th class="text-end">ROI</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var y in stats.ByYear)
+                    {
+                        <tr>
+                            <td>@y.Year</td>
+                            <td class="text-end">@y.Entries</td>
+                            <td class="text-end">@Format.Money(y.Buyin)</td>
+                            <td class="text-end">@Format.Money(y.Cashes)</td>
+                            <td class="text-end @Format.SignClass(y.Profit)">@Format.Money(y.Profit)</td>
+                            <td class="text-end @Format.SignClass((decimal)y.Roi)">@Format.Percent(y.Roi)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private TournamentStats? stats;
+    private bool notAuthorized;
+    private bool loadError;
+
+    protected override Task OnInitializedAsync() => ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        notAuthorized = false;
+        loadError = false;
+        stats = null;
+        try
+        {
+            stats = await Tournaments.GetStatsAsync();
+        }
+        catch (NotAuthorizedException)
+        {
+            notAuthorized = true;
+        }
+        catch
+        {
+            loadError = true;
+        }
+    }
+
+    private string InTheMoney()
+    {
+        if (stats!.TotalEntries == 0) return "";
+        var pct = (double)stats.CashCount / stats.TotalEntries;
+        return $"{pct.ToString("P0", System.Globalization.CultureInfo.InvariantCulture)} ITM";
+    }
+
+    private RenderFragment StatCard(string label, string value, string valueClass = "", string? subtitle = null) =>
+        @<div class="col-6 col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">@label</div>
+                    <div class="fs-4 fw-semibold @valueClass">@value</div>
+                    @if (subtitle is not null)
+                    {
+                        <div class="text-muted small">@subtitle</div>
+                    }
+                </div>
+            </div>
+        </div>;
+}

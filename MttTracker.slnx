@@ -1,3 +1,14 @@
 <Solution>
-  <Project Path="MttTracker.csproj" />
+  <Folder Name="/Api/">
+    <Project Path="Api/MttTracker.Api.csproj" />
+  </Folder>
+  <Folder Name="/Client/">
+    <Project Path="Client/MttTracker.Client.csproj" />
+  </Folder>
+  <Folder Name="/Shared/">
+    <Project Path="Shared/MttTracker.Shared.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="README.md" />
+  </Folder>
 </Solution>

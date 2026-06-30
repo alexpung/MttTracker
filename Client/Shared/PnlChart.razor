@@ -1,0 +1,67 @@
+@if (Points is null || Points.Count == 0)
+{
+    <p class="text-muted mb-0">No data yet — add a tournament to see your profit curve.</p>
+}
+else
+{
+    <svg viewBox="0 0 @Width @Height" class="pnl-chart" preserveAspectRatio="none" role="img" aria-label="Cumulative profit and loss over time">
+        <!-- zero line -->
+        <line x1="@Pad" y1="@Y(0).ToString(Inv)" x2="@(Width - Pad)" y2="@Y(0).ToString(Inv)"
+              stroke="#adb5bd" stroke-width="1" stroke-dasharray="4 4" />
+
+        <!-- area under the curve -->
+        <polygon points="@AreaPoints" fill="@(IsProfit ? "rgba(25,135,84,0.15)" : "rgba(220,53,69,0.15)")" />
+
+        <!-- profit line -->
+        <polyline points="@LinePoints" fill="none"
+                  stroke="@(IsProfit ? "#198754" : "#dc3545")" stroke-width="2"
+                  stroke-linejoin="round" stroke-linecap="round" />
+    </svg>
+    <div class="d-flex justify-content-between text-muted small mt-1">
+        <span>@Points[0].Date.ToString("MMM yyyy")</span>
+        <span>@Points[^1].Date.ToString("MMM yyyy")</span>
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<PnlPoint>? Points { get; set; }
+
+    private const int Width = 800;
+    private const int Height = 280;
+    private const int Pad = 30;
+    private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
+
+    private decimal Min => Points!.Min(p => p.Cumulative);
+    private decimal Max => Points!.Max(p => p.Cumulative);
+    private bool IsProfit => Points![^1].Cumulative >= 0;
+
+    private double X(int index)
+    {
+        if (Points!.Count == 1) return Width / 2.0;
+        return Pad + (double)index / (Points!.Count - 1) * (Width - 2 * Pad);
+    }
+
+    private double Y(decimal value)
+    {
+        var min = Math.Min(Min, 0m);
+        var max = Math.Max(Max, 0m);
+        var range = max - min;
+        if (range == 0) return Height / 2.0;
+        var t = (double)((value - min) / range);
+        return Height - Pad - t * (Height - 2 * Pad);
+    }
+
+    private string LinePoints =>
+        string.Join(" ", Points!.Select((p, i) => $"{X(i).ToString(Inv)},{Y(p.Cumulative).ToString(Inv)}"));
+
+    private string AreaPoints
+    {
+        get
+        {
+            var baseY = Y(0).ToString(Inv);
+            var first = X(0).ToString(Inv);
+            var last = X(Points!.Count - 1).ToString(Inv);
+            return $"{first},{baseY} {LinePoints} {last},{baseY}";
+        }
+    }
+}

@@ -1,0 +1,32 @@
+@inherits LayoutComponentBase
+
+<header class="app-bar">
+    <a class="app-bar-brand" href="">♠ MTT Tracker</a>
+    <AuthorizeView>
+        <Authorized>
+            <a class="btn btn-sm btn-outline-light" href="/.auth/logout">Log out</a>
+        </Authorized>
+        <NotAuthorized>
+            <a class="btn btn-sm btn-outline-light" href="/.auth/login/github">Log in</a>
+        </NotAuthorized>
+    </AuthorizeView>
+</header>
+
+<main class="app-content container">
+    @Body
+</main>
+
+<AuthorizeView>
+    <Authorized>
+        <nav class="tab-bar">
+            <NavLink class="tab-item" href="" Match="NavLinkMatch.All">
+                <span class="tab-ico">📊</span>
+                <span>Dashboard</span>
+            </NavLink>
+            <NavLink class="tab-item" href="entries">
+                <span class="tab-ico">🃏</span>
+                <span>Tournaments</span>
+            </NavLink>
+        </nav>
+    </Authorized>
+</AuthorizeView>

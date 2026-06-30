@@ -1,0 +1,367 @@
+@page "/entries"
+@attribute [Authorize]
+@inject TournamentService Tournaments
+@inject ExchangeRateService Rates
+
+<PageTitle>Tournaments</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">Tournaments</h1>
+    @if (!showForm && !notAuthorized && !loadError)
+    {
+        <button class="btn btn-primary" @onclick="StartAdd">+ Add</button>
+    }
+</div>
+
+@if (notAuthorized)
+{
+    <div class="alert alert-warning">
+        <strong>Not authorized.</strong> You're signed in, but this account isn't
+        allowed to use this app. <a href="/.auth/logout">Sign out</a> and sign in
+        with the owner's GitHub account.
+    </div>
+}
+else if (loadError)
+{
+    <div class="alert alert-danger">
+        Couldn't load your tournaments. <button class="btn btn-sm btn-outline-danger ms-2" @onclick="LoadAsync">Retry</button>
+    </div>
+}
+else
+{
+
+@if (showForm)
+{
+    <div class="card mb-3">
+        <div class="card-header">@(IsNew ? "Add tournament" : "Edit tournament")</div>
+        <div class="card-body">
+            <EditForm Model="model" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" />
+
+                <div class="mb-3">
+                    <label class="form-label">Date</label>
+                    <InputDate @bind-Value="model.Date" @bind-Value:after="RefreshRateAsync" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Location / event</label>
+                    <InputText @bind-Value="model.Location" class="form-control" placeholder="e.g. Aria $400 NLH" />
+                    <ValidationMessage For="() => model.Location" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Currency</label>
+                    <InputSelect @bind-Value="model.Currency" @bind-Value:after="RefreshRateAsync" class="form-select">
+                        @foreach (var c in Currencies.All)
+                        {
+                            <option value="@c.Code">@c.Code — @c.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Buy-in (per entry)</label>
+                    <div class="input-group">
+                        <span class="input-group-text">@CurrencySymbol</span>
+                        <InputNumber @bind-Value="model.Buyin" class="form-control" inputmode="decimal" />
+                    </div>
+                    @if (!model.IsHomeCurrency && rate is decimal br)
+                    {
+                        <div class="form-text">≈ @Format.Money(model.TotalBuyin * br) total in GBP</div>
+                    }
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Re-entries</label>
+                    <InputNumber @bind-Value="model.ReEntries" class="form-control" inputmode="numeric" />
+                    <div class="form-text">Extra buy-ins beyond the first entry.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Cash / winnings</label>
+                    <div class="input-group">
+                        <span class="input-group-text">@CurrencySymbol</span>
+                        <InputNumber @bind-Value="model.Cash" class="form-control" inputmode="decimal" />
+                    </div>
+                    @if (!model.IsHomeCurrency && rate is decimal cr)
+                    {
+                        <div class="form-text">≈ @Format.Money(model.Cash * cr) in GBP</div>
+                    }
+                </div>
+
+                @if (!model.IsHomeCurrency)
+                {
+                    <div class="mb-3">
+                        @if (rateLoading)
+                        {
+                            <div class="text-muted small">Fetching exchange rate…</div>
+                        }
+                        else if (rateError)
+                        {
+                            <div class="alert alert-warning py-2 mb-0 small">
+                                Couldn't fetch the @model.Currency→GBP rate for @model.Date.ToString("d MMM yyyy").
+                                <button type="button" class="btn btn-sm btn-link p-0 align-baseline" @onclick="RefreshRateAsync">Retry</button>
+                            </div>
+                        }
+                        else if (rate is decimal r)
+                        {
+                            <div class="text-muted small">
+                                Rate on @model.Date.ToString("d MMM yyyy"):
+                                @Format.Money(1, model.Currency) ≈ @Format.Rate(r)
+                                <span class="text-secondary">(frozen with this entry)</span>
+                            </div>
+                        }
+                    </div>
+                }
+                <div class="mb-3">
+                    <label class="form-label">Place (optional)</label>
+                    <InputNumber @bind-Value="model.Place" class="form-control" inputmode="numeric" placeholder="Finishing position" />
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">@(IsNew ? "Add tournament" : "Save changes")</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (entries.Count == 0)
+{
+    <div class="alert alert-info">No tournaments yet. Tap <strong>+ Add</strong> to record one.</div>
+}
+else
+{
+    <div class="d-flex flex-column gap-2">
+        @foreach (var e in entries)
+        {
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="pe-2">
+                            <div class="fw-semibold">@e.Location</div>
+                            <div class="text-muted small">
+                                @e.Date.ToString("ddd, d MMM yyyy")
+                                · @e.Entries @(e.Entries == 1 ? "entry" : "entries")
+                                @if (!e.IsHomeCurrency)
+                                {
+                                    <text> · @e.Currency</text>
+                                }
+                                @if (e.Place is int p)
+                                {
+                                    <text> · #@p</text>
+                                }
+                            </div>
+                        </div>
+                        <div class="fs-5 fw-bold text-nowrap @Format.SignClass(e.ProfitGbp)">@Format.Money(e.ProfitGbp)</div>
+                    </div>
+
+                    <div class="d-flex justify-content-between text-muted small mt-2">
+                        <span>Buy-in @Format.Money(e.TotalBuyin, e.Currency)</span>
+                        <span>Cash @Format.Money(e.Cash, e.Currency)</span>
+                    </div>
+                    @if (!e.IsHomeCurrency)
+                    {
+                        <div class="d-flex justify-content-between text-secondary small">
+                            <span>≈ @Format.Money(e.TotalBuyinGbp)</span>
+                            <span>≈ @Format.Money(e.CashGbp)</span>
+                        </div>
+                    }
+
+                    <div class="d-flex gap-2 mt-3">
+                        <button class="btn btn-sm btn-outline-primary flex-fill" @onclick="() => Edit(e)">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger flex-fill" @onclick="() => DeleteAsync(e.Id)">Delete</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+}
+
+@code {
+    private List<TournamentEntry> entries = new();
+    private TournamentEntry model = NewModel();
+    private bool showForm;
+    private bool notAuthorized;
+    private bool loadError;
+
+    // Live exchange-rate preview state for the form (home currency per unit of
+    // the entry's currency). Null rate + rateError means the lookup failed.
+    private decimal? rate = 1m;
+    private bool rateLoading;
+    private bool rateError;
+
+    private bool IsNew => string.IsNullOrEmpty(model.Id);
+
+    private string CurrencySymbol => Currencies.Symbol(model.Currency).Trim();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        notAuthorized = false;
+        loadError = false;
+        try
+        {
+            entries = await Tournaments.GetEntriesAsync();
+        }
+        catch (NotAuthorizedException)
+        {
+            notAuthorized = true;
+        }
+        catch
+        {
+            loadError = true;
+        }
+    }
+
+    private void StartAdd()
+    {
+        model = NewModel();
+        rate = 1m;
+        rateError = false;
+        rateLoading = false;
+        showForm = true;
+    }
+
+    /// <summary>
+    /// Fetches the home-currency rate for the model's currency and date and
+    /// freezes it onto the model. Runs whenever the currency or date changes.
+    /// </summary>
+    private async Task RefreshRateAsync()
+    {
+        if (model.IsHomeCurrency)
+        {
+            model.ExchangeRate = 1m;
+            rate = 1m;
+            rateError = false;
+            rateLoading = false;
+            return;
+        }
+
+        rateLoading = true;
+        rateError = false;
+        var fetched = await Rates.GetHomeRateAsync(model.Currency, model.Date);
+        rateLoading = false;
+
+        if (fetched is decimal r)
+        {
+            rate = r;
+            model.ExchangeRate = r;
+            rateError = false;
+        }
+        else
+        {
+            rate = null;
+            rateError = true;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        // A foreign-currency entry must have a resolved rate before it's stored,
+        // otherwise its GBP value (and all stats) would be wrong.
+        if (!model.IsHomeCurrency)
+        {
+            if (rate is null || rateError)
+            {
+                await RefreshRateAsync();
+            }
+            if (rate is null)
+            {
+                return;
+            }
+        }
+        else
+        {
+            model.ExchangeRate = 1m;
+        }
+
+        try
+        {
+            if (IsNew)
+            {
+                await Tournaments.AddAsync(model);
+            }
+            else
+            {
+                await Tournaments.UpdateAsync(model);
+            }
+        }
+        catch (NotAuthorizedException)
+        {
+            notAuthorized = true;
+            return;
+        }
+        catch
+        {
+            loadError = true;
+            return;
+        }
+
+        CancelForm();
+        await LoadAsync();
+    }
+
+    private void Edit(TournamentEntry e)
+    {
+        // Edit a copy so cancelling doesn't mutate the list row.
+        model = new TournamentEntry
+        {
+            Id = e.Id,
+            UserId = e.UserId,
+            Date = e.Date,
+            Location = e.Location,
+            Currency = e.Currency,
+            ExchangeRate = e.ExchangeRate,
+            Buyin = e.Buyin,
+            ReEntries = e.ReEntries,
+            Cash = e.Cash,
+            Place = e.Place,
+        };
+        // Show the rate frozen on the entry; changing currency/date re-fetches.
+        rate = e.ExchangeRate;
+        rateError = false;
+        rateLoading = false;
+        showForm = true;
+    }
+
+    private async Task DeleteAsync(string id)
+    {
+        try
+        {
+            await Tournaments.DeleteAsync(id);
+        }
+        catch (NotAuthorizedException)
+        {
+            notAuthorized = true;
+            return;
+        }
+        catch
+        {
+            loadError = true;
+            return;
+        }
+
+        if (model.Id == id)
+        {
+            CancelForm();
+        }
+        await LoadAsync();
+    }
+
+    private void CancelForm()
+    {
+        showForm = false;
+        model = NewModel();
+    }
+
+    private static TournamentEntry NewModel() => new()
+    {
+        Date = DateOnly.FromDateTime(DateTime.Today),
+        Currency = Currencies.Home,
+        ExchangeRate = 1m,
+    };
+}
