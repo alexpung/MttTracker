@@ -12,14 +12,18 @@ Built with **.NET 10 Blazor WebAssembly** on **Azure Static Web Apps**, a small
 ## Features
 
 - **Track every event** — date, location/event, buy-in, re-entries, cash, and
-  finishing place. Re-entries are costed automatically.
+  finishing place. Re-entries are costed automatically. Adding a new entry
+  pre-fills the date from your last tournament and suggests recently-used
+  locations; deleting one asks for confirmation first.
 - **Multi-currency with automatic historical FX.** Enter a buy-in or cash in any
   supported currency and the app fetches the exchange rate **for that
   tournament's date** (free [Frankfurter](https://frankfurter.dev) ECB data — no
   API key) and converts it to your home currency. The rate is *frozen* onto each
   entry, so your historical stats never drift when rates move later.
-- **Dashboard** — net profit, ROI, in-the-money %, average buy-in, a cumulative
-  P&L chart, and a by-year breakdown, all expressed in your home currency.
+- **Dashboard** — net profit, ROI, in-the-money %, average buy-in, best cash
+  streak, worst no-cash streak, an interactive cumulative P&L chart (hover for
+  the date, running total, and that tournament's result), and a by-year
+  breakdown, all expressed in your home currency.
 - **Private by design** — GitHub login, locked to a single allow-listed account;
   the API fails closed if the allowlist is unset.
 
@@ -89,7 +93,9 @@ Stored as Cosmos documents in container `entries`, partitioned by `/userId`.
 - An **Azure subscription** (the free tiers are enough for a single user).
 - A **GitHub account** — used as the login provider.
 - The **[Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli)** (`az`).
-- For local development or machine-based deploys: the **.NET 10 SDK**, the
+- For local development or machine-based deploys: the **.NET 10 SDK** (it also
+  builds and runs the `net8.0`-targeted `Api`/`Shared` projects — see the
+  runtime note in step 3), the
   **[Azure Functions Core Tools](https://learn.microsoft.com/azure/azure-functions/functions-run-local)**,
   the **[Static Web Apps CLI](https://azure.github.io/static-web-apps-cli/)**
   (`npm i -g @azure/static-web-apps-cli`), and the
@@ -190,10 +196,11 @@ Browse to the app's URL, sign in with GitHub, and you're in:
 az staticwebapp show -n $SWA -g $RG --query "defaultHostname" -o tsv
 ```
 
-> **Runtime note:** SWA-managed Functions must support the API's target framework
-> (`net10.0`). If the deploy reports an unsupported runtime, retarget `Api/` (and
-> `Shared/`) to `net8.0` — no code changes are needed — or use the Standard plan's
-> "bring your own Functions" option.
+> **Runtime note:** `Api/` and `Shared/` target `net8.0` (not `net10.0` like
+> `Client/`), since SWA-managed Functions don't yet support a `net10.0` isolated
+> worker. If a future SWA release adds `net10.0` support, all three projects can
+> be retargeted together — no code changes needed — or use the Standard plan's
+> "bring your own Functions" option today if you need it sooner.
 
 ---
 
@@ -263,5 +270,6 @@ This repo is safe to host publicly — no keys live in it, by design:
 
 ## License
 
-No license file is bundled. If you publish a fork, add your own `LICENSE`.
-Provided as-is, without warranty.
+MIT — see [`LICENSE.txt`](LICENSE.txt). Provided as-is, without warranty. If you
+publish a fork, fill in the copyright holder placeholder in `LICENSE.txt` (or
+swap in your own license).
