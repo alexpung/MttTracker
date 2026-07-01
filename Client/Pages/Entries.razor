@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @inject TournamentService Tournaments
 @inject ExchangeRateService Rates
+@inject IJSRuntime JS
 
 <PageTitle>Tournaments</PageTitle>
 
@@ -370,7 +371,7 @@ else
         }
     }
 
-    private void Edit(TournamentEntry e)
+    private async Task Edit(TournamentEntry e)
     {
         // Edit a copy so cancelling doesn't mutate the list row.
         model = new TournamentEntry
@@ -392,6 +393,10 @@ else
         rateLoading = false;
         pendingDeleteId = null;
         showForm = true;
+
+        // The edit form renders at the top of the page, above the entry list -
+        // jump there so it's immediately visible instead of off-screen.
+        await JS.InvokeVoidAsync("scrollTo", new { top = 0, behavior = "smooth" });
     }
 
     private async Task DeleteAsync(string id)
