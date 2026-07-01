@@ -17,4 +17,38 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.9" />
   </ItemGroup>
 
+  <!--
+    Stamps the current git commit into a generated BuildInfo class so the
+    dashboard can show which build is deployed/running - handy for telling
+    a stale cached build apart from a fresh one.
+  -->
+  <Target Name="WriteBuildInfo" BeforeTargets="CoreCompile">
+    <Exec Command="git rev-parse --short HEAD"
+          ConsoleToMSBuild="true"
+          StandardOutputImportance="low"
+          StandardErrorImportance="low"
+          ContinueOnError="WarnAndContinue"
+          IgnoreExitCode="true"
+          WorkingDirectory="$(MSBuildProjectDirectory)">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitCommitSha" />
+      <Output TaskParameter="ExitCode" PropertyName="GitExitCode" />
+    </Exec>
+    <PropertyGroup>
+      <!-- Discard anything captured (e.g. stderr text) when git failed, then fall back to the
+           GitHub Actions commit SHA if the build environment has no .git directory. -->
+      <GitCommitSha Condition="'$(GitExitCode)' != '0'"></GitCommitSha>
+      <GitCommitSha Condition="'$(GitCommitSha)' == '' and '$(GITHUB_SHA)' != ''">$(GITHUB_SHA.Substring(0, 7))</GitCommitSha>
+      <GitCommitSha Condition="'$(GitCommitSha)' == ''">unknown</GitCommitSha>
+      <BuildInfoFile>$(IntermediateOutputPath)BuildInfo.g.cs</BuildInfoFile>
+      <BuildTimestampUtc>$([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm"))</BuildTimestampUtc>
+    </PropertyGroup>
+    <WriteLinesToFile
+        File="$(BuildInfoFile)"
+        Overwrite="true"
+        Lines="namespace MttTracker.Client { internal static class BuildInfo { public const string CommitSha = &quot;$(GitCommitSha)&quot;%3B public const string BuiltAtUtc = &quot;$(BuildTimestampUtc)&quot;%3B } }" />
+    <ItemGroup>
+      <Compile Include="$(BuildInfoFile)" />
+    </ItemGroup>
+  </Target>
+
 </Project>
