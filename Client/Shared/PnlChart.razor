@@ -32,7 +32,7 @@ else
                 var idx = i;
                 var left = idx == 0 ? 0 : (X(idx - 1) + X(idx)) / 2;
                 var right = idx == Points.Count - 1 ? Width : (X(idx) + X(idx + 1)) / 2;
-                <rect x="@left.ToString(Inv)" y="0" width="@(right - left).ToString(Inv)" height="@Height"
+                <rect x="@left.ToString(Inv)" y="0" width="@((right - left).ToString(Inv))" height="@Height"
                       fill="transparent" @onmouseenter="() => hoverIndex = idx" />
             }
         </svg>
