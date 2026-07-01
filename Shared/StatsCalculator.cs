@@ -22,8 +22,12 @@ public record TournamentStats(
 /// <summary>Profit summary for a single calendar year.</summary>
 public record YearStat(int Year, int Entries, decimal Buyin, decimal Cashes, decimal Profit, double Roi);
 
-/// <summary>A point on the cumulative profit/loss curve.</summary>
-public record PnlPoint(DateOnly Date, decimal Cumulative);
+/// <summary>
+/// A point on the cumulative profit/loss curve. <see cref="Location"/> and
+/// <see cref="Profit"/> describe the single tournament that produced this
+/// point, in home-currency (GBP).
+/// </summary>
+public record PnlPoint(DateOnly Date, decimal Cumulative, string Location, decimal Profit);
 
 /// <summary>
 /// Pure profit/loss aggregation over a list of tournament entries. Side-effect
@@ -74,7 +78,7 @@ public static class StatsCalculator
             .Select(e =>
             {
                 running += e.ProfitGbp;
-                return new PnlPoint(e.Date, running);
+                return new PnlPoint(e.Date, running, e.Location, e.ProfitGbp);
             })
             .ToList();
 
