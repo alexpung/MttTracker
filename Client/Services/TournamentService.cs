@@ -23,18 +23,24 @@ public sealed class TournamentService(HttpClient http)
             ?? new List<TournamentEntry>();
     }
 
-    public async Task AddAsync(TournamentEntry entry)
+    /// <summary>Creates the entry and returns the server's copy (with its assigned id).</summary>
+    public async Task<TournamentEntry> AddAsync(TournamentEntry entry)
     {
         var response = await http.PostAsJsonAsync("api/entries", entry);
         await EnsureAllowedAsync(response);
         response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TournamentEntry>()
+            ?? throw new InvalidOperationException("Create response had no body.");
     }
 
-    public async Task UpdateAsync(TournamentEntry entry)
+    /// <summary>Updates the entry and returns the server's copy.</summary>
+    public async Task<TournamentEntry> UpdateAsync(TournamentEntry entry)
     {
         var response = await http.PutAsJsonAsync($"api/entries/{entry.Id}", entry);
         await EnsureAllowedAsync(response);
         response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TournamentEntry>()
+            ?? throw new InvalidOperationException("Update response had no body.");
     }
 
     public async Task DeleteAsync(string id)

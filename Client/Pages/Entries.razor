@@ -344,11 +344,17 @@ else
             {
                 if (IsNew)
                 {
-                    await Tournaments.AddAsync(model);
+                    var created = await Tournaments.AddAsync(model);
+                    entries.Add(created);
                 }
                 else
                 {
-                    await Tournaments.UpdateAsync(model);
+                    var updated = await Tournaments.UpdateAsync(model);
+                    var index = entries.FindIndex(e => e.Id == updated.Id);
+                    if (index >= 0)
+                    {
+                        entries[index] = updated;
+                    }
                 }
             }
             catch (NotAuthorizedException)
@@ -362,8 +368,9 @@ else
                 return;
             }
 
+            // Keep the newest-first order the API returns without a full re-fetch.
+            entries = entries.OrderByDescending(e => e.Date).ToList();
             CancelForm();
-            await LoadAsync();
         }
         finally
         {
@@ -419,12 +426,12 @@ else
                 return;
             }
 
+            entries.RemoveAll(e => e.Id == id);
             pendingDeleteId = null;
             if (model.Id == id)
             {
                 CancelForm();
             }
-            await LoadAsync();
         }
         finally
         {

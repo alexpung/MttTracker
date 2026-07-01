@@ -64,9 +64,21 @@ else
     private const int Pad = 30;
     private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
 
-    private decimal Min => Points!.Min(p => p.Cumulative);
-    private decimal Max => Points!.Max(p => p.Cumulative);
+    // Computed once per Points change (OnParametersSet) rather than re-scanning
+    // the whole list on every Y() call, which is invoked once per point.
+    private decimal scaleMin;
+    private decimal scaleMax;
+
     private bool IsProfit => Points![^1].Cumulative >= 0;
+
+    protected override void OnParametersSet()
+    {
+        if (Points is { Count: > 0 })
+        {
+            scaleMin = Math.Min(Points.Min(p => p.Cumulative), 0m);
+            scaleMax = Math.Max(Points.Max(p => p.Cumulative), 0m);
+        }
+    }
 
     private void ClearHover() => hoverIndex = null;
 
@@ -78,11 +90,9 @@ else
 
     private double Y(decimal value)
     {
-        var min = Math.Min(Min, 0m);
-        var max = Math.Max(Max, 0m);
-        var range = max - min;
+        var range = scaleMax - scaleMin;
         if (range == 0) return Height / 2.0;
-        var t = (double)((value - min) / range);
+        var t = (double)((value - scaleMin) / range);
         return Height - Pad - t * (Height - 2 * Pad);
     }
 
