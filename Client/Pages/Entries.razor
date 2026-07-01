@@ -9,7 +9,7 @@
     <h1 class="mb-0">Tournaments</h1>
     @if (!showForm && !notAuthorized && !loadError)
     {
-        <button class="btn btn-primary" @onclick="StartAdd">+ Add</button>
+        <button class="btn btn-primary" @onclick="StartAdd" disabled="@IsBusy">+ Add</button>
     }
 </div>
 
@@ -40,90 +40,102 @@ else
                 <DataAnnotationsValidator />
                 <ValidationSummary class="text-danger" />
 
-                <div class="mb-3">
-                    <label class="form-label">Date</label>
-                    <InputDate @bind-Value="model.Date" @bind-Value:after="RefreshRateAsync" class="form-control" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Location / event</label>
-                    <InputText @bind-Value="model.Location" class="form-control" list="locationOptions" placeholder="e.g. Aria $400 NLH" />
-                    <datalist id="locationOptions">
-                        @foreach (var loc in RecentLocations)
-                        {
-                            <option value="@loc" />
-                        }
-                    </datalist>
-                    <ValidationMessage For="() => model.Location" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Currency</label>
-                    <InputSelect @bind-Value="model.Currency" @bind-Value:after="RefreshRateAsync" class="form-select">
-                        @foreach (var c in Currencies.All)
-                        {
-                            <option value="@c.Code">@c.Code — @c.Name</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Buy-in (per entry)</label>
-                    <div class="input-group">
-                        <span class="input-group-text">@CurrencySymbol</span>
-                        <InputNumber @bind-Value="model.Buyin" class="form-control" inputmode="decimal" />
-                    </div>
-                    @if (!model.IsHomeCurrency && rate is decimal br)
-                    {
-                        <div class="form-text">≈ @Format.Money(model.TotalBuyin * br) total in GBP</div>
-                    }
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Re-entries</label>
-                    <InputNumber @bind-Value="model.ReEntries" class="form-control" inputmode="numeric" />
-                    <div class="form-text">Extra buy-ins beyond the first entry.</div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Cash / winnings</label>
-                    <div class="input-group">
-                        <span class="input-group-text">@CurrencySymbol</span>
-                        <InputNumber @bind-Value="model.Cash" class="form-control" inputmode="decimal" />
-                    </div>
-                    @if (!model.IsHomeCurrency && rate is decimal cr)
-                    {
-                        <div class="form-text">≈ @Format.Money(model.Cash * cr) in GBP</div>
-                    }
-                </div>
-
-                @if (!model.IsHomeCurrency)
-                {
+                <fieldset disabled="@isSaving">
                     <div class="mb-3">
-                        @if (rateLoading)
+                        <label class="form-label">Date</label>
+                        <InputDate @bind-Value="model.Date" @bind-Value:after="RefreshRateAsync" class="form-control" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Location / event</label>
+                        <InputText @bind-Value="model.Location" class="form-control" list="locationOptions" placeholder="e.g. Aria $400 NLH" />
+                        <datalist id="locationOptions">
+                            @foreach (var loc in RecentLocations)
+                            {
+                                <option value="@loc" />
+                            }
+                        </datalist>
+                        <ValidationMessage For="() => model.Location" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Currency</label>
+                        <InputSelect @bind-Value="model.Currency" @bind-Value:after="RefreshRateAsync" class="form-select">
+                            @foreach (var c in Currencies.All)
+                            {
+                                <option value="@c.Code">@c.Code — @c.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Buy-in (per entry)</label>
+                        <div class="input-group">
+                            <span class="input-group-text">@CurrencySymbol</span>
+                            <InputNumber @bind-Value="model.Buyin" class="form-control" inputmode="decimal" />
+                        </div>
+                        @if (!model.IsHomeCurrency && rate is decimal br)
                         {
-                            <div class="text-muted small">Fetching exchange rate…</div>
-                        }
-                        else if (rateError)
-                        {
-                            <div class="alert alert-warning py-2 mb-0 small">
-                                Couldn't fetch the @model.Currency→GBP rate for @model.Date.ToString("d MMM yyyy").
-                                <button type="button" class="btn btn-sm btn-link p-0 align-baseline" @onclick="RefreshRateAsync">Retry</button>
-                            </div>
-                        }
-                        else if (rate is decimal r)
-                        {
-                            <div class="text-muted small">
-                                Rate on @model.Date.ToString("d MMM yyyy"):
-                                @Format.Money(1, model.Currency) ≈ @Format.Rate(r)
-                                <span class="text-secondary">(frozen with this entry)</span>
-                            </div>
+                            <div class="form-text">≈ @Format.Money(model.TotalBuyin * br) total in GBP</div>
                         }
                     </div>
-                }
-                <div class="mb-3">
-                    <label class="form-label">Place (optional)</label>
-                    <InputNumber @bind-Value="model.Place" class="form-control" inputmode="numeric" placeholder="Finishing position" />
-                </div>
+                    <div class="mb-3">
+                        <label class="form-label">Re-entries</label>
+                        <InputNumber @bind-Value="model.ReEntries" class="form-control" inputmode="numeric" />
+                        <div class="form-text">Extra buy-ins beyond the first entry.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Cash / winnings</label>
+                        <div class="input-group">
+                            <span class="input-group-text">@CurrencySymbol</span>
+                            <InputNumber @bind-Value="model.Cash" class="form-control" inputmode="decimal" />
+                        </div>
+                        @if (!model.IsHomeCurrency && rate is decimal cr)
+                        {
+                            <div class="form-text">≈ @Format.Money(model.Cash * cr) in GBP</div>
+                        }
+                    </div>
+
+                    @if (!model.IsHomeCurrency)
+                    {
+                        <div class="mb-3">
+                            @if (rateLoading)
+                            {
+                                <div class="text-muted small">Fetching exchange rate…</div>
+                            }
+                            else if (rateError)
+                            {
+                                <div class="alert alert-warning py-2 mb-0 small">
+                                    Couldn't fetch the @model.Currency→GBP rate for @model.Date.ToString("d MMM yyyy").
+                                    <button type="button" class="btn btn-sm btn-link p-0 align-baseline" @onclick="RefreshRateAsync">Retry</button>
+                                </div>
+                            }
+                            else if (rate is decimal r)
+                            {
+                                <div class="text-muted small">
+                                    Rate on @model.Date.ToString("d MMM yyyy"):
+                                    @Format.Money(1, model.Currency) ≈ @Format.Rate(r)
+                                    <span class="text-secondary">(frozen with this entry)</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                    <div class="mb-3">
+                        <label class="form-label">Place (optional)</label>
+                        <InputNumber @bind-Value="model.Place" class="form-control" inputmode="numeric" placeholder="Finishing position" />
+                    </div>
+                </fieldset>
 
                 <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-primary">@(IsNew ? "Add tournament" : "Save changes")</button>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm">Cancel</button>
+                    <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <text>Saving…</text>
+                        }
+                        else
+                        {
+                            @(IsNew ? "Add tournament" : "Save changes")
+                        }
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CancelForm" disabled="@isSaving">Cancel</button>
                 </div>
             </EditForm>
         </div>
@@ -176,15 +188,24 @@ else
                     {
                         <div class="d-flex align-items-center gap-2 mt-3">
                             <span class="text-danger small flex-fill">Delete this tournament?</span>
-                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(e.Id)">Yes, delete</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="CancelDelete">Cancel</button>
+                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(e.Id)" disabled="@(deletingId == e.Id)">
+                                @if (deletingId == e.Id)
+                                {
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                }
+                                else
+                                {
+                                    <text>Yes, delete</text>
+                                }
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="CancelDelete" disabled="@(deletingId == e.Id)">Cancel</button>
                         </div>
                     }
                     else
                     {
                         <div class="d-flex gap-2 mt-3">
-                            <button class="btn btn-sm btn-outline-primary flex-fill" @onclick="() => Edit(e)">Edit</button>
-                            <button class="btn btn-sm btn-outline-danger flex-fill" @onclick="() => pendingDeleteId = e.Id">Delete</button>
+                            <button class="btn btn-sm btn-outline-primary flex-fill" @onclick="() => Edit(e)" disabled="@IsBusy">Edit</button>
+                            <button class="btn btn-sm btn-outline-danger flex-fill" @onclick="() => pendingDeleteId = e.Id" disabled="@IsBusy">Delete</button>
                         </div>
                     }
                 </div>
@@ -202,6 +223,10 @@ else
     private bool notAuthorized;
     private bool loadError;
     private string? pendingDeleteId;
+    private bool isSaving;
+    private string? deletingId;
+
+    private bool IsBusy => isSaving || deletingId is not null;
 
     // Live exchange-rate preview state for the form (home currency per unit of
     // the entry's currency). Null rate + rateError means the lookup failed.
@@ -293,48 +318,56 @@ else
 
     private async Task SaveAsync()
     {
-        // A foreign-currency entry must have a resolved rate before it's stored,
-        // otherwise its GBP value (and all stats) would be wrong.
-        if (!model.IsHomeCurrency)
-        {
-            if (rate is null || rateError)
-            {
-                await RefreshRateAsync();
-            }
-            if (rate is null)
-            {
-                return;
-            }
-        }
-        else
-        {
-            model.ExchangeRate = 1m;
-        }
-
+        isSaving = true;
         try
         {
-            if (IsNew)
+            // A foreign-currency entry must have a resolved rate before it's stored,
+            // otherwise its GBP value (and all stats) would be wrong.
+            if (!model.IsHomeCurrency)
             {
-                await Tournaments.AddAsync(model);
+                if (rate is null || rateError)
+                {
+                    await RefreshRateAsync();
+                }
+                if (rate is null)
+                {
+                    return;
+                }
             }
             else
             {
-                await Tournaments.UpdateAsync(model);
+                model.ExchangeRate = 1m;
             }
-        }
-        catch (NotAuthorizedException)
-        {
-            notAuthorized = true;
-            return;
-        }
-        catch
-        {
-            loadError = true;
-            return;
-        }
 
-        CancelForm();
-        await LoadAsync();
+            try
+            {
+                if (IsNew)
+                {
+                    await Tournaments.AddAsync(model);
+                }
+                else
+                {
+                    await Tournaments.UpdateAsync(model);
+                }
+            }
+            catch (NotAuthorizedException)
+            {
+                notAuthorized = true;
+                return;
+            }
+            catch
+            {
+                loadError = true;
+                return;
+            }
+
+            CancelForm();
+            await LoadAsync();
+        }
+        finally
+        {
+            isSaving = false;
+        }
     }
 
     private void Edit(TournamentEntry e)
@@ -363,27 +396,35 @@ else
 
     private async Task DeleteAsync(string id)
     {
+        deletingId = id;
         try
         {
-            await Tournaments.DeleteAsync(id);
-        }
-        catch (NotAuthorizedException)
-        {
-            notAuthorized = true;
-            return;
-        }
-        catch
-        {
-            loadError = true;
-            return;
-        }
+            try
+            {
+                await Tournaments.DeleteAsync(id);
+            }
+            catch (NotAuthorizedException)
+            {
+                notAuthorized = true;
+                return;
+            }
+            catch
+            {
+                loadError = true;
+                return;
+            }
 
-        pendingDeleteId = null;
-        if (model.Id == id)
-        {
-            CancelForm();
+            pendingDeleteId = null;
+            if (model.Id == id)
+            {
+                CancelForm();
+            }
+            await LoadAsync();
         }
-        await LoadAsync();
+        finally
+        {
+            deletingId = null;
+        }
     }
 
     private void CancelDelete() => pendingDeleteId = null;
