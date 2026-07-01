@@ -30,6 +30,14 @@ Built with **.NET 10 Blazor WebAssembly** on **Azure Static Web Apps**, a small
 > The home/reporting currency defaults to **GBP (£)**. Changing it is a one-line
 > edit — see [Customizing](#customizing).
 
+## Screenshots
+
+| Dashboard | Tournaments |
+|-----------|-------------|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Tournaments list](docs/screenshots/tournaments.png) |
+
+*(Mock data, shown at mobile phone resolution.)*
+
 ## Architecture
 
 ```
