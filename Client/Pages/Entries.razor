@@ -172,10 +172,21 @@ else
                         </div>
                     }
 
-                    <div class="d-flex gap-2 mt-3">
-                        <button class="btn btn-sm btn-outline-primary flex-fill" @onclick="() => Edit(e)">Edit</button>
-                        <button class="btn btn-sm btn-outline-danger flex-fill" @onclick="() => DeleteAsync(e.Id)">Delete</button>
-                    </div>
+                    @if (pendingDeleteId == e.Id)
+                    {
+                        <div class="d-flex align-items-center gap-2 mt-3">
+                            <span class="text-danger small flex-fill">Delete this tournament?</span>
+                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(e.Id)">Yes, delete</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="CancelDelete">Cancel</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex gap-2 mt-3">
+                            <button class="btn btn-sm btn-outline-primary flex-fill" @onclick="() => Edit(e)">Edit</button>
+                            <button class="btn btn-sm btn-outline-danger flex-fill" @onclick="() => pendingDeleteId = e.Id">Delete</button>
+                        </div>
+                    }
                 </div>
             </div>
         }
@@ -190,6 +201,7 @@ else
     private bool showForm;
     private bool notAuthorized;
     private bool loadError;
+    private string? pendingDeleteId;
 
     // Live exchange-rate preview state for the form (home currency per unit of
     // the entry's currency). Null rate + rateError means the lookup failed.
@@ -242,6 +254,7 @@ else
         rate = 1m;
         rateError = false;
         rateLoading = false;
+        pendingDeleteId = null;
         showForm = true;
     }
 
@@ -344,6 +357,7 @@ else
         rate = e.ExchangeRate;
         rateError = false;
         rateLoading = false;
+        pendingDeleteId = null;
         showForm = true;
     }
 
@@ -364,12 +378,15 @@ else
             return;
         }
 
+        pendingDeleteId = null;
         if (model.Id == id)
         {
             CancelForm();
         }
         await LoadAsync();
     }
+
+    private void CancelDelete() => pendingDeleteId = null;
 
     private void CancelForm()
     {
