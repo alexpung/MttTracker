@@ -46,7 +46,13 @@ else
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Location / event</label>
-                    <InputText @bind-Value="model.Location" class="form-control" placeholder="e.g. Aria $400 NLH" />
+                    <InputText @bind-Value="model.Location" class="form-control" list="locationOptions" placeholder="e.g. Aria $400 NLH" />
+                    <datalist id="locationOptions">
+                        @foreach (var loc in RecentLocations)
+                        {
+                            <option value="@loc" />
+                        }
+                    </datalist>
                     <ValidationMessage For="() => model.Location" />
                 </div>
                 <div class="mb-3">
@@ -195,6 +201,14 @@ else
 
     private string CurrencySymbol => Currencies.Symbol(model.Currency).Trim();
 
+    /// <summary>Up to 10 distinct locations, most recently played first, for the location datalist.</summary>
+    private IEnumerable<string> RecentLocations =>
+        entries
+            .OrderByDescending(e => e.Date)
+            .Select(e => e.Location)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(10);
+
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
@@ -221,6 +235,10 @@ else
     private void StartAdd()
     {
         model = NewModel();
+        if (entries.Count > 0)
+        {
+            model.Date = entries.Max(e => e.Date);
+        }
         rate = 1m;
         rateError = false;
         rateLoading = false;
