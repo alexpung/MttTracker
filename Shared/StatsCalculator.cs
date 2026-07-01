@@ -11,11 +11,13 @@ public record TournamentStats(
     decimal AverageBuyin,
     decimal AverageProfit,
     int CashCount,
+    int BestCashStreakDays,
+    int WorstNoCashStreakDays,
     IReadOnlyList<YearStat> ByYear,
     IReadOnlyList<PnlPoint> Pnl)
 {
     public static readonly TournamentStats Empty = new(
-        0, 0, 0m, 0m, 0m, 0d, 0m, 0m, 0,
+        0, 0, 0m, 0m, 0m, 0d, 0m, 0m, 0, 0, 0,
         Array.Empty<YearStat>(), Array.Empty<PnlPoint>());
 }
 
@@ -53,6 +55,17 @@ public static class StatsCalculator
         var averageProfit = netProfit / entries.Count;
         var cashCount = entries.Count(e => e.Cash > 0);
 
+        // Streaks are computed per calendar day rather than per entry, so a
+        // multi-entry day (re-buys, multiple events) counts once: a "cash day"
+        // if any entry that day cashed, a "non-cash day" otherwise.
+        var dailyCashed = entries
+            .GroupBy(e => e.Date)
+            .OrderBy(g => g.Key)
+            .Select(g => g.Any(e => e.Cash > 0))
+            .ToList();
+        var bestCashStreakDays = LongestStreak(dailyCashed, cashed: true);
+        var worstNoCashStreakDays = LongestStreak(dailyCashed, cashed: false);
+
         var byYear = entries
             .GroupBy(e => e.Date.Year)
             .OrderBy(g => g.Key)
@@ -84,6 +97,20 @@ public static class StatsCalculator
 
         return new TournamentStats(
             entries.Count, totalEntries, totalBuyin, totalCashes, netProfit,
-            roi, averageBuyin, averageProfit, cashCount, byYear, pnl);
+            roi, averageBuyin, averageProfit, cashCount,
+            bestCashStreakDays, worstNoCashStreakDays, byYear, pnl);
+    }
+
+    /// <summary>Longest run of consecutive entries in <paramref name="days"/> equal to <paramref name="cashed"/>.</summary>
+    private static int LongestStreak(IReadOnlyList<bool> days, bool cashed)
+    {
+        var best = 0;
+        var current = 0;
+        foreach (var dayCashed in days)
+        {
+            current = dayCashed == cashed ? current + 1 : 0;
+            best = Math.Max(best, current);
+        }
+        return best;
     }
 }

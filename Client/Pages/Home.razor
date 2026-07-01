@@ -45,6 +45,8 @@ else
         @StatCard("Cashed", $"{stats.CashCount}", subtitle: InTheMoney())
         @StatCard("Avg buy-in", Format.Money2(stats.AverageBuyin))
         @StatCard("Avg profit / event", Format.Money2(stats.AverageProfit), Format.SignClass(stats.AverageProfit))
+        @StatCard("Best cash streak", DayCount(stats.BestCashStreakDays), "text-success")
+        @StatCard("Worst no-cash streak", DayCount(stats.WorstNoCashStreakDays), stats.WorstNoCashStreakDays > 0 ? "text-danger" : "")
     </div>
 
     <div class="card mb-4">
@@ -122,6 +124,8 @@ else
         var pct = (double)stats.CashCount / stats.TotalEntries;
         return $"{pct.ToString("P0", System.Globalization.CultureInfo.InvariantCulture)} ITM";
     }
+
+    private static string DayCount(int days) => $"{days} {(days == 1 ? "day" : "days")}";
 
     private RenderFragment StatCard(string label, string value, string valueClass = "", string? subtitle = null) =>
         @<div class="col-6 col-md-3">
