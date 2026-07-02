@@ -1,5 +1,8 @@
 # ♠ MTT Tracker
 
+> **▶ Try it now: [alexpung.github.io/MttTracker](https://alexpung.github.io/MttTracker/)** —
+> no sign-up, no install; your data stays in your own browser.
+
 A self-hostable poker **multi-table tournament (MTT)** tracker. Record your
 tournament results and watch your profit & loss over time.
 
