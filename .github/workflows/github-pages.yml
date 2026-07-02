@@ -1,0 +1,74 @@
+# Publishes the PUBLIC version of the app to GitHub Pages. This build uses
+# browser localStorage instead of the Azure Functions API + Cosmos DB: there is
+# no login and no backend — every visitor's data stays in their own browser
+# (with JSON export/import for backups). The private Azure deployment is
+# handled by the separate Static Web Apps workflow.
+#
+# One-time setup: repo Settings → Pages → Source → "GitHub Actions".
+name: Deploy public version to GitHub Pages
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One Pages deployment at a time; let an in-flight run finish.
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # Switch the client to browser-storage mode BEFORE publishing, so the
+      # file's integrity hash in the Blazor boot manifest stays correct.
+      - name: Select browser storage mode
+        run: echo '{ "Storage": "browser" }' > Client/wwwroot/appsettings.json
+
+      - name: Publish client
+        run: dotnet publish Client -c Release -o publish
+
+      - name: Prepare static site for GitHub Pages
+        run: |
+          SITE=publish/wwwroot
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          # Project pages are served under /<repo>/, not /.
+          sed -i "s|<base href=\"/\" />|<base href=\"/${REPO_NAME}/\" />|" "$SITE/index.html"
+          # Deep links (e.g. /entries) must serve the app shell so the Blazor
+          # router can take over.
+          cp "$SITE/index.html" "$SITE/404.html"
+          # Stop Pages' Jekyll pass from dropping the _framework folder.
+          touch "$SITE/.nojekyll"
+          # Azure SWA config is meaningless here, and Pages never serves the
+          # precompressed variants.
+          rm -f "$SITE/staticwebapp.config.json"
+          find "$SITE" \( -name '*.br' -or -name '*.gz' \) -delete
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: publish/wwwroot
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

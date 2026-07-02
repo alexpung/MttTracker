@@ -1,13 +1,20 @@
 # ♠ MTT Tracker
 
 A self-hostable poker **multi-table tournament (MTT)** tracker. Record your
-tournament results and watch your profit & loss over time. You deploy your **own
-private instance** to Azure and lock it to **your** GitHub account — your data
-lives in your Cosmos DB, and nobody else can sign in.
+tournament results and watch your profit & loss over time.
 
-Built with **.NET 10 Blazor WebAssembly** on **Azure Static Web Apps**, a small
-**Azure Functions** API, and **Azure Cosmos DB**. Runs comfortably on Azure's
-**free tiers**.
+Built with **.NET 10 Blazor WebAssembly**, it can be deployed **two ways** —
+same app, different storage backend:
+
+1. **Private Azure instance** (the original) — Azure Static Web Apps + a small
+   **Azure Functions** API + **Azure Cosmos DB**, locked to **your** GitHub
+   account. Your data lives in your Cosmos DB and nobody else can sign in.
+   Runs comfortably on Azure's **free tiers**.
+2. **Public static version on GitHub Pages** — no Azure, no database, no login.
+   Data is saved in the visitor's own **browser storage** (localStorage), and
+   JSON **export/import** covers backups and moving data between devices or
+   deployments. See
+   [Deploy the public version to GitHub Pages](#deploy-the-public-version-to-github-pages-no-azure).
 
 ## Features
 
@@ -24,8 +31,14 @@ Built with **.NET 10 Blazor WebAssembly** on **Azure Static Web Apps**, a small
   streak, worst no-cash streak, an interactive cumulative P&L chart (hover for
   the date, running total, and that tournament's result), and a by-year
   breakdown, all expressed in your home currency.
-- **Private by design** — GitHub login, locked to a single allow-listed account;
-  the API fails closed if the allowlist is unset.
+- **Export / import as JSON.** One tap downloads all your tournaments as a JSON
+  file; importing merges a file back in (entries with a known id are updated,
+  the rest are added). Works in both storage modes, so it doubles as the
+  migration path between an Azure instance and the browser-storage version.
+- **Private by design** (Azure mode) — GitHub login, locked to a single
+  allow-listed account; the API fails closed if the allowlist is unset.
+- **Or fully local** (browser-storage mode) — nothing ever leaves the browser;
+  each visitor sees only their own data.
 
 > The home/reporting currency defaults to **GBP (£)**. Changing it is a one-line
 > edit — see [Customizing](#customizing).
@@ -40,6 +53,8 @@ Built with **.NET 10 Blazor WebAssembly** on **Azure Static Web Apps**, a small
 
 ## Architecture
 
+**Azure mode** (`"Storage": "api"`, the default):
+
 ```
 Browser ──► Blazor WASM (static files on Azure Static Web Apps)
                 │
@@ -50,10 +65,26 @@ Browser ──► Blazor WASM (static files on Azure Static Web Apps)
                                      └─► Azure Cosmos DB (container: entries, pk /userId)
 ```
 
+**Browser-storage mode** (`"Storage": "browser"`, used by the GitHub Pages build):
+
+```
+Browser ──► Blazor WASM (static files on GitHub Pages, or any static host)
+                │
+                └─► localStorage (key: mtttracker.entries) — no API, no login
+```
+
+The client code is identical in both modes. Pages talk to an
+`ITournamentService` abstraction; at startup, `Program.cs` reads the `Storage`
+value from `wwwroot/appsettings.json` and registers either
+`ApiTournamentService` (HTTP → Functions → Cosmos) or
+`BrowserStorageTournamentService` (localStorage). Browser-storage mode also
+swaps the SWA authentication provider for an always-signed-in local user, so
+there is no login flow.
+
 | Project   | What it is | Notes |
 |-----------|------------|-------|
-| `Client/` | Blazor WebAssembly UI | Served as static files; calls `/api/*`. Fetches FX rates directly from Frankfurter. |
-| `Api/`    | Azure Functions (.NET isolated) | CRUD over Cosmos; enforces the single-user allowlist. |
+| `Client/` | Blazor WebAssembly UI | Served as static files; calls `/api/*` **or** localStorage depending on the `Storage` setting. Fetches FX rates directly from Frankfurter. |
+| `Api/`    | Azure Functions (.NET isolated) | CRUD over Cosmos; enforces the single-user allowlist. Not deployed in browser-storage mode. |
 | `Shared/` | Class library | `TournamentEntry`, `StatsCalculator`, `Currencies`, `Format` — shared by Client and Api. |
 
 ### Why an API at all?
@@ -62,6 +93,12 @@ A WebAssembly client runs entirely in the browser, so it can't safely hold a
 Cosmos DB key. The Functions API is the only component that touches Cosmos and is
 where the "only my account" rule is enforced — even if another GitHub user signed
 in, the API rejects them.
+
+The browser-storage version needs neither: with no shared database there's
+nothing to protect, so it ships as pure static files. The trade-off is
+durability — localStorage belongs to one browser profile on one device, and
+clearing site data deletes it. **Export a JSON backup regularly** (the
+Tournaments page reminds you).
 
 ## Privacy & the single-user lock
 
@@ -90,7 +127,45 @@ TotalBuyinGbp  = TotalBuyin * ExchangeRate    (home currency; used for all stats
 ROI            = NetProfit / TotalBuyin
 ```
 
-Stored as Cosmos documents in container `entries`, partitioned by `/userId`.
+Stored as Cosmos documents in container `entries`, partitioned by `/userId` —
+or, in browser-storage mode, as a JSON array under the localStorage key
+`mtttracker.entries`. The JSON export file is a plain array of these entries,
+so the same file round-trips through either backend.
+
+---
+
+## Deploy the public version to GitHub Pages (no Azure)
+
+This deploys the **browser-storage** flavor: a free, public static site where
+every visitor's data stays in their own browser. Nothing to provision and no
+secrets to configure.
+
+1. Fork (or push) this repository to your GitHub account.
+2. In the repo, go to **Settings → Pages** and set **Source** to
+   **GitHub Actions** (one-time).
+3. Push to `master` (or run the workflow manually from the *Actions* tab). The
+   [`github-pages.yml`](.github/workflows/github-pages.yml) workflow publishes
+   the client with `"Storage": "browser"`, rewrites the `<base href>` for the
+   `/<repo>/` sub-path, and deploys it.
+
+Your app comes up at `https://<you>.github.io/<repo>/`.
+
+**How it differs from the Azure version:**
+
+- No login — the app opens straight onto the dashboard.
+- Data lives in that browser's localStorage only. Different device (or private
+  browsing, or cleared site data) = different (or no) data.
+- **Export JSON** / **Import JSON** on the Tournaments page are your backup,
+  restore, and device-to-device transfer tools.
+
+**Moving data from your Azure instance:** open the Azure app → Tournaments →
+*Export JSON*, then open the Pages app → Tournaments → *Import JSON*. (The same
+works in reverse.)
+
+> Both workflows trigger on pushes to `master`: the SWA workflow deploys the
+> private Azure instance and `github-pages.yml` deploys the public version. If
+> you only want one of them, delete the other workflow file (Pages simply fails
+> to deploy until you complete step 2, which is harmless).
 
 ---
 
@@ -214,6 +289,12 @@ az staticwebapp show -n $SWA -g $RG --query "defaultHostname" -o tsv
 
 ## Customizing
 
+- **Storage mode.** `Client/wwwroot/appsettings.json` holds
+  `{ "Storage": "api" }` (Azure Functions + Cosmos) by default; set it to
+  `"browser"` to use localStorage instead. The GitHub Pages workflow overwrites
+  this file at build time, so you don't normally edit it — but flipping it is
+  handy for local testing (see below) or for hosting the browser version on any
+  other static host.
 - **Home / reporting currency.** Defaults to GBP. Edit `Shared/Currencies.cs`:
   ```csharp
   public const string Home = "GBP";   // e.g. "USD", "EUR" — any code in All
@@ -224,6 +305,17 @@ az staticwebapp show -n $SWA -g $RG --query "defaultHostname" -o tsv
   using each entry's frozen rate.
 
 ## Running locally
+
+**Browser-storage mode (quick):** no API, emulator, or SWA CLI needed. Set
+`"Storage": "browser"` in `Client/wwwroot/appsettings.json`, then:
+
+```bash
+cd Client && dotnet run     # browse to http://localhost:5080
+```
+
+(Remember to set it back to `"api"` before committing.)
+
+**Azure (api) mode:**
 
 1. Configure `Api/local.settings.json` — set `CosmosConnectionString` (the
    emulator's well-known connection string is pre-filled) and `AllowedUserDetails`

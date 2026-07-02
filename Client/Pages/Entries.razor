@@ -1,7 +1,10 @@
 @page "/entries"
 @attribute [Authorize]
-@inject TournamentService Tournaments
+@using System.ComponentModel.DataAnnotations
+@using System.Text.Json
+@inject ITournamentService Tournaments
 @inject ExchangeRateService Rates
+@inject StorageOptions Storage
 @inject IJSRuntime JS
 
 <PageTitle>Tournaments</PageTitle>
@@ -31,6 +34,33 @@ else if (loadError)
 }
 else
 {
+
+@if (!showForm)
+{
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <button class="btn btn-sm btn-outline-secondary" @onclick="ExportAsync"
+                disabled="@(IsBusy || entries.Count == 0)">Export JSON</button>
+        <label class="btn btn-sm btn-outline-secondary mb-0 @(IsBusy ? "disabled" : "")">
+            @(isImporting ? "Importing…" : "Import JSON")
+            @* @key recreates the input after each import so re-selecting the
+               same file still fires OnChange. *@
+            <InputFile @key="importInputKey" OnChange="ImportFileAsync" accept=".json,application/json" class="d-none" disabled="@IsBusy" />
+        </label>
+        @if (Storage.UseBrowserStorage)
+        {
+            <span class="text-muted small">Data is saved in this browser only — export regularly to back up.</span>
+        }
+    </div>
+
+    @if (importMessage is not null)
+    {
+        <div class="alert alert-success py-2">@importMessage</div>
+    }
+    @if (importError is not null)
+    {
+        <div class="alert alert-warning py-2">@importError</div>
+    }
+}
 
 @if (showForm)
 {
@@ -226,8 +256,12 @@ else
     private string? pendingDeleteId;
     private bool isSaving;
     private string? deletingId;
+    private bool isImporting;
+    private string? importMessage;
+    private string? importError;
+    private int importInputKey;
 
-    private bool IsBusy => isSaving || deletingId is not null;
+    private bool IsBusy => isSaving || deletingId is not null || isImporting;
 
     // Live exchange-rate preview state for the form (home currency per unit of
     // the entry's currency). Null rate + rateError means the lookup failed.
@@ -440,6 +474,97 @@ else
     }
 
     private void CancelDelete() => pendingDeleteId = null;
+
+    private static readonly JsonSerializerOptions ExportJson = new() { WriteIndented = true };
+
+    /// <summary>Downloads all tournaments as a JSON file (backup / migration).</summary>
+    private async Task ExportAsync()
+    {
+        importMessage = null;
+        importError = null;
+        var json = JsonSerializer.Serialize(entries.OrderByDescending(e => e.Date), ExportJson);
+        var name = $"mtt-tracker-export-{DateTime.Today:yyyy-MM-dd}.json";
+        await JS.InvokeVoidAsync("mttSaveFile", name, json);
+    }
+
+    /// <summary>
+    /// Imports a JSON export: entries whose id already exists are updated,
+    /// everything else is added. The whole file is validated up front so a bad
+    /// file is rejected before anything is written.
+    /// </summary>
+    private async Task ImportFileAsync(InputFileChangeEventArgs e)
+    {
+        importMessage = null;
+        importError = null;
+        isImporting = true;
+        try
+        {
+            List<TournamentEntry>? imported;
+            try
+            {
+                using var stream = e.File.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                imported = await JsonSerializer.DeserializeAsync<List<TournamentEntry>>(stream);
+            }
+            catch
+            {
+                importError = "That file isn't a valid MTT Tracker JSON export.";
+                return;
+            }
+
+            if (imported is null || imported.Count == 0)
+            {
+                importError = "The file contains no tournaments.";
+                return;
+            }
+
+            for (var i = 0; i < imported.Count; i++)
+            {
+                if (!TryValidate(imported[i], out var error))
+                {
+                    importError = $"Entry {i + 1} of {imported.Count} is invalid: {error}";
+                    return;
+                }
+            }
+
+            try
+            {
+                var result = await Tournaments.ImportAsync(imported);
+                entries = await Tournaments.GetEntriesAsync();
+                importMessage = $"Import complete: {result.Added} added, {result.Updated} updated.";
+            }
+            catch (NotAuthorizedException)
+            {
+                notAuthorized = true;
+            }
+            catch
+            {
+                importError = "Import failed part-way — reload the page to see what was saved.";
+            }
+        }
+        finally
+        {
+            isImporting = false;
+            importInputKey++;
+        }
+    }
+
+    /// <summary>Same checks the API applies: data annotations plus a supported currency.</summary>
+    private static bool TryValidate(TournamentEntry entry, out string? error)
+    {
+        var results = new List<ValidationResult>();
+        if (!Validator.TryValidateObject(entry, new ValidationContext(entry), results, validateAllProperties: true))
+        {
+            error = string.Join("; ", results.Select(r => r.ErrorMessage));
+            return false;
+        }
+        if (!Currencies.IsSupported((entry.Currency ?? "").Trim().ToUpperInvariant()))
+        {
+            error = $"unsupported currency '{entry.Currency}'.";
+            return false;
+        }
+        error = null;
+        return true;
+    }
 
     private void CancelForm()
     {

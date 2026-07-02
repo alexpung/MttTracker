@@ -12,7 +12,7 @@ namespace MttTracker.Client.Services;
 /// A 403 from the API (caller not on the allowlist) surfaces as
 /// <see cref="NotAuthorizedException"/>.
 /// </summary>
-public sealed class TournamentService(HttpClient http)
+public sealed class ApiTournamentService(HttpClient http) : ITournamentService
 {
     public async Task<List<TournamentEntry>> GetEntriesAsync()
     {
@@ -54,6 +54,28 @@ public sealed class TournamentService(HttpClient http)
     {
         var entries = await GetEntriesAsync();
         return StatsCalculator.ComputeStats(entries);
+    }
+
+    public async Task<ImportResult> ImportAsync(IReadOnlyList<TournamentEntry> entries)
+    {
+        var existingIds = (await GetEntriesAsync()).Select(e => e.Id).ToHashSet();
+        var added = 0;
+        var updated = 0;
+        foreach (var entry in entries)
+        {
+            if (!string.IsNullOrEmpty(entry.Id) && existingIds.Contains(entry.Id))
+            {
+                await UpdateAsync(entry);
+                updated++;
+            }
+            else
+            {
+                // The API assigns a fresh id on create.
+                await AddAsync(entry);
+                added++;
+            }
+        }
+        return new ImportResult(added, updated);
     }
 
     private static Task EnsureAllowedAsync(HttpResponseMessage response)
