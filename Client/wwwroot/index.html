@@ -27,6 +27,20 @@
         <span class="dismiss">🗙</span>
     </div>
 
+    <script>
+        // Saves text as a downloaded file (used by the JSON export).
+        window.mttSaveFile = (fileName, text) => {
+            const blob = new Blob([text], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        };
+    </script>
     <script src="_framework/blazor.webassembly.js"></script>
 </body>
 

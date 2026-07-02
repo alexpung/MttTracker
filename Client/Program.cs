@@ -18,12 +18,26 @@ builder.Services.AddScoped(_ => new HttpClient
     BaseAddress = new Uri(builder.HostEnvironment.BaseAddress),
 });
 
-builder.Services.AddAuthorizationCore();
-builder.Services.AddScoped<SwaAuthenticationStateProvider>();
-builder.Services.AddScoped<AuthenticationStateProvider>(
-    sp => sp.GetRequiredService<SwaAuthenticationStateProvider>());
+// Storage backend, from wwwroot/appsettings.json: "api" (Azure Functions +
+// Cosmos DB, the private deployment — default) or "browser" (localStorage, no
+// backend and no login — the public GitHub Pages build).
+var useBrowserStorage = string.Equals(
+    builder.Configuration["Storage"], "browser", StringComparison.OrdinalIgnoreCase);
+builder.Services.AddSingleton(new StorageOptions(useBrowserStorage));
 
-builder.Services.AddScoped<TournamentService>();
+builder.Services.AddAuthorizationCore();
+if (useBrowserStorage)
+{
+    builder.Services.AddScoped<AuthenticationStateProvider, LocalAuthenticationStateProvider>();
+    builder.Services.AddScoped<ITournamentService, BrowserStorageTournamentService>();
+}
+else
+{
+    builder.Services.AddScoped<SwaAuthenticationStateProvider>();
+    builder.Services.AddScoped<AuthenticationStateProvider>(
+        sp => sp.GetRequiredService<SwaAuthenticationStateProvider>());
+    builder.Services.AddScoped<ITournamentService, ApiTournamentService>();
+}
 
 // Historical FX lookups go directly to Frankfurter (a different origin than the
 // app), so this service gets its own HttpClient rather than the app-origin one.
