@@ -36,7 +36,8 @@ jobs:
       # Switch the client to browser-storage mode BEFORE publishing, so the
       # file's integrity hash in the Blazor boot manifest stays correct.
       - name: Select browser storage mode
-        run: echo '{ "Storage": "browser" }' > Client/wwwroot/appsettings.json
+        run: |
+          echo '{ "Storage": "browser" }' > Client/wwwroot/appsettings.json
 
       - name: Publish client
         run: dotnet publish Client -c Release -o publish
