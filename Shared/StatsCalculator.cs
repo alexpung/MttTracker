@@ -55,11 +55,10 @@ public static class StatsCalculator
         var averageProfit = netProfit / entries.Count;
         var cashCount = entries.Count(e => e.Cash > 0);
 
-        // The best cash streak only advances on a clean, single-entry cash;
-        // a re-entered tournament never extends it, win or lose. The worst
-        // no-cash streak treats every buy-in as its own attempt (FIFO), so a
-        // re-entered tournament's earlier busts still extend it - only an
-        // eventual cash ends the run, whether or not that cash was clean.
+        // Both streaks treat every buy-in as its own attempt (FIFO): a
+        // re-entered tournament's earlier busts extend the no-cash streak and
+        // break the cash streak, and its final buy-in - the only one that can
+        // cash - then starts or extends the cash streak.
         var (bestCashStreak, worstNoCashStreak) = ComputeStreaks(entries);
 
         var byYear = entries
@@ -100,12 +99,11 @@ public static class StatsCalculator
     /// <summary>
     /// Walks entries in chronological order (same-day entries in <see cref="TournamentEntry.Id"/>
     /// order, matching the PnL curve), expanding each one into its individual
-    /// buy-ins on a FIFO basis. A single clean entry that cashes extends the
-    /// cash streak; one that doesn't extends the no-cash streak. A re-entered
-    /// tournament's earlier buy-ins are busts like any other (each extending
-    /// the no-cash streak in turn) - only its last buy-in can differ, and if
-    /// that one cashes it ends the no-cash run without itself counting as a
-    /// clean win, since re-entering to get there isn't a clean cash.
+    /// buy-ins on a FIFO basis. Each busted buy-in extends the no-cash streak
+    /// and breaks the cash streak; each cashing buy-in (always a tournament's
+    /// last) extends the cash streak and breaks the no-cash streak. So a
+    /// re-entered tournament that cashes ends any run of clean cashes before
+    /// it, but its own cash still counts toward a new streak.
     /// </summary>
     private static (int BestCashStreak, int WorstNoCashStreak) ComputeStreaks(IReadOnlyList<TournamentEntry> entries)
     {
@@ -121,28 +119,18 @@ public static class StatsCalculator
             var cashed = e.Cash > 0;
             var busts = cashed ? e.Entries - 1 : e.Entries;
 
-            for (var i = 0; i < busts; i++)
+            if (busts > 0)
             {
-                currentNoCashStreak++;
-                currentCashStreak = 0;
+                currentNoCashStreak += busts;
                 worstNoCashStreak = Math.Max(worstNoCashStreak, currentNoCashStreak);
+                currentCashStreak = 0;
             }
 
-            if (!cashed)
-            {
-                continue;
-            }
-
-            if (e.Entries == 1)
+            if (cashed)
             {
                 currentCashStreak++;
                 currentNoCashStreak = 0;
                 bestCashStreak = Math.Max(bestCashStreak, currentCashStreak);
-            }
-            else
-            {
-                currentCashStreak = 0;
-                currentNoCashStreak = 0;
             }
         }
 
