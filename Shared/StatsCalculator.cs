@@ -55,10 +55,10 @@ public static class StatsCalculator
         var averageProfit = netProfit / entries.Count;
         var cashCount = entries.Count(e => e.Cash > 0);
 
-        // The best cash streak counts consecutive tournaments that cashed,
-        // regardless of re-entries. The worst no-cash streak treats every
-        // buy-in as its own attempt (FIFO), so a re-entered tournament's
-        // earlier busts still extend it - only an eventual cash ends the run.
+        // Both streaks treat every buy-in as its own attempt (FIFO): a
+        // re-entered tournament's earlier busts extend the no-cash streak and
+        // break the cash streak, and its final buy-in - the only one that can
+        // cash - then starts or extends the cash streak.
         var (bestCashStreak, worstNoCashStreak) = ComputeStreaks(entries);
 
         var byYear = entries
@@ -98,11 +98,12 @@ public static class StatsCalculator
 
     /// <summary>
     /// Walks entries in chronological order (same-day entries in <see cref="TournamentEntry.Id"/>
-    /// order, matching the PnL curve). The cash streak counts consecutive
-    /// tournaments that cashed - re-entries don't matter, only whether the
-    /// tournament ended in a cash. The no-cash streak counts individual busted
-    /// buy-ins, so a re-entered tournament's earlier buy-ins each extend it
-    /// even when the final buy-in cashes.
+    /// order, matching the PnL curve), expanding each one into its individual
+    /// buy-ins on a FIFO basis. Each busted buy-in extends the no-cash streak
+    /// and breaks the cash streak; each cashing buy-in (always a tournament's
+    /// last) extends the cash streak and breaks the no-cash streak. So a
+    /// re-entered tournament that cashes ends any run of clean cashes before
+    /// it, but its own cash still counts toward a new streak.
     /// </summary>
     private static (int BestCashStreak, int WorstNoCashStreak) ComputeStreaks(IReadOnlyList<TournamentEntry> entries)
     {
@@ -118,18 +119,18 @@ public static class StatsCalculator
             var cashed = e.Cash > 0;
             var busts = cashed ? e.Entries - 1 : e.Entries;
 
-            currentNoCashStreak += busts;
-            worstNoCashStreak = Math.Max(worstNoCashStreak, currentNoCashStreak);
+            if (busts > 0)
+            {
+                currentNoCashStreak += busts;
+                worstNoCashStreak = Math.Max(worstNoCashStreak, currentNoCashStreak);
+                currentCashStreak = 0;
+            }
 
             if (cashed)
             {
                 currentCashStreak++;
                 currentNoCashStreak = 0;
                 bestCashStreak = Math.Max(bestCashStreak, currentCashStreak);
-            }
-            else
-            {
-                currentCashStreak = 0;
             }
         }
 
