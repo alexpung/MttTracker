@@ -13,6 +13,9 @@ namespace MttTracker.Api;
 /// <summary>
 /// CRUD endpoints for tournament entries. Every operation is scoped to the
 /// authenticated, allow-listed user resolved by <see cref="RequestAuthorizer"/>.
+/// Writes only accept a JSON content type: a cross-site page can't send one
+/// without a CORS preflight (which the API never grants), so it can't forge a
+/// write with the signed-in user's cookie.
 /// </summary>
 public class EntriesFunctions(
     CosmosEntryStore store,
@@ -42,6 +45,11 @@ public class EntriesFunctions(
             return denied;
         }
 
+        if (!req.HasJsonContentType())
+        {
+            return new UnsupportedMediaTypeResult();
+        }
+
         var entry = await ReadBodyAsync(req);
         if (entry is null)
         {
@@ -69,6 +77,11 @@ public class EntriesFunctions(
         if (Gate(req, out var userId) is { } denied)
         {
             return denied;
+        }
+
+        if (!req.HasJsonContentType())
+        {
+            return new UnsupportedMediaTypeResult();
         }
 
         var entry = await ReadBodyAsync(req);

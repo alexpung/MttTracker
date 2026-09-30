@@ -112,9 +112,16 @@ your instance private:
    route and blocks all non-GitHub providers, so anonymous visitors are
    redirected to GitHub login.
 2. **The API** independently re-checks the authenticated principal against an
-   allowlist (`AllowedUserDetails` = your GitHub username, and/or `AllowedUserId`).
-   This is the real security boundary — set it, or the API fails closed and
-   rejects everyone.
+   allowlist (`AllowedUserDetails` = your GitHub username, and/or `AllowedUserId`;
+   a match on either is enough). This is the real security boundary — set it,
+   or the API fails closed and rejects everyone. Prefer `AllowedUserId` on its
+   own once you know it (see [step 5](#5-sign-in)): it's an id Static Web Apps
+   assigns your account for this app, whereas a GitHub username is released
+   when you rename and can then be registered by someone else.
+
+`staticwebapp.config.json` also sends a Content-Security-Policy (scripts from
+the app's own origin only, no framing), and the API only accepts JSON bodies on
+writes, so another site can't submit a form to it with your login cookie.
 
 ## Data model
 
@@ -281,6 +288,11 @@ Browse to the app's URL, sign in with GitHub, and you're in:
 ```bash
 az staticwebapp show -n $SWA -g $RG --query "defaultHostname" -o tsv
 ```
+
+Then lock the allowlist to your account id rather than your username: open
+`https://<your-app>/.auth/me`, copy `clientPrincipal.userId`, and set it as the
+`AllowedUserId` app setting. Once the app still loads, delete
+`AllowedUserDetails`, since either setting matching is enough to get in.
 
 > **Runtime note:** `Api/` and `Shared/` target `net8.0` (not `net10.0` like
 > `Client/`), since SWA-managed Functions don't yet support a `net10.0` isolated
