@@ -38,6 +38,8 @@ else
         sp => sp.GetRequiredService<SwaAuthenticationStateProvider>());
     builder.Services.AddScoped<ITournamentService, ApiTournamentService>();
 }
+builder.Services.AddScoped<AccessService>();
+builder.Services.AddScoped<IcmInputs>();
 
 // Historical FX lookups go directly to Frankfurter (a different origin than the
 // app), so this service gets its own HttpClient rather than the app-origin one.
