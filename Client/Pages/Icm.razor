@@ -1,0 +1,400 @@
+@page "/icm"
+@attribute [Authorize]
+@using System.Globalization
+@inject AccessService Access
+@inject IcmInputs Inputs
+
+<PageTitle>ICM calculator</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">ICM calculator</h1>
+    @if (allowed)
+    {
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Inputs.Clear">Clear</button>
+    }
+</div>
+
+@if (notAuthorized)
+{
+    <div class="alert alert-warning">
+        <strong>Not authorized.</strong> You're signed in with a GitHub account that
+        isn't allowed to use this app.
+        <a href="/.auth/logout?post_logout_redirect_uri=/logged-out.html">Sign out</a> —
+        then, to switch accounts, also sign out of GitHub before signing back in.
+    </div>
+}
+else if (loadError)
+{
+    <div class="alert alert-danger">
+        Couldn't check your access. <button class="btn btn-sm btn-outline-danger ms-2" @onclick="CheckAccessAsync">Retry</button>
+    </div>
+}
+else if (!allowed)
+{
+    <p>Loading…</p>
+}
+else
+{
+    var calc = Calculate();
+
+    <div class="card mb-3">
+        <div class="card-header">Chip stacks</div>
+        <div class="card-body">
+            @for (var i = 0; i < IcmCalculator.MaxPlayers; i++)
+            {
+                var idx = i;
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <input type="text" class="form-control" placeholder="@DefaultName(idx)"
+                               aria-label="@($"Player {idx + 1} name")" @bind="Inputs.Names[idx]" />
+                    </div>
+                    <div class="col-6">
+                        <input type="number" class="form-control" min="0" step="any" inputmode="decimal" placeholder="Chips"
+                               aria-label="@($"Player {idx + 1} chips")" @bind="Inputs.Stacks[idx]" />
+                    </div>
+                </div>
+            }
+            <div class="text-muted small">
+                @SeatCount @(SeatCount == 1 ? "player" : "players") · @Chips(TotalChips) chips.
+                Leave a stack blank for an empty seat.
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Payouts</span>
+            <select class="form-select form-select-sm w-auto" aria-label="Currency" @bind="Inputs.Currency">
+                @foreach (var c in Currencies.All)
+                {
+                    <option value="@c.Code">@c.Code</option>
+                }
+            </select>
+        </div>
+        <div class="card-body">
+            <div class="form-check mb-3">
+                <input class="form-check-input darker-border-checkbox" type="checkbox" id="icmCompare" @bind="Inputs.CompareAlternate" />
+                <label class="form-check-label" for="icmCompare">Compare an alternate payout structure</label>
+            </div>
+
+            @if (Inputs.CompareAlternate)
+            {
+                <div class="row g-2 mb-1 text-muted small">
+                    <div class="col-6">Current</div>
+                    <div class="col-6">Alternate</div>
+                </div>
+            }
+            @for (var i = 0; i < IcmCalculator.MaxPlayers; i++)
+            {
+                var idx = i;
+                <div class="row g-2 mb-2">
+                    <div class="@(Inputs.CompareAlternate ? "col-6" : "col-12")">
+                        <div class="input-group">
+                            <span class="input-group-text icm-place">@Ordinal(idx + 1)</span>
+                            <input type="number" class="form-control" min="0" step="any" inputmode="decimal" placeholder="0"
+                                   aria-label="@($"{Ordinal(idx + 1)} place prize")" @bind="Inputs.Prizes[idx]" />
+                        </div>
+                    </div>
+                    @if (Inputs.CompareAlternate)
+                    {
+                        <div class="col-6">
+                            <input type="number" class="form-control" min="0" step="any" inputmode="decimal" placeholder="0"
+                                   aria-label="@($"{Ordinal(idx + 1)} place alternate prize")" @bind="Inputs.AlternatePrizes[idx]" />
+                        </div>
+                    }
+                </div>
+            }
+            <div class="text-muted small">
+                Prize pool @Money(Inputs.Prizes.Sum(p => p ?? 0m))
+                @if (Inputs.CompareAlternate)
+                {
+                    <text> · alternate @Money(Inputs.AlternatePrizes.Sum(p => p ?? 0m))</text>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">Deal</div>
+        <div class="card-body">
+            <label class="form-label" for="icmSetAside">Set aside for the winner</label>
+            <div class="input-group">
+                <span class="input-group-text">@Currencies.Symbol(Inputs.Currency).Trim()</span>
+                <input id="icmSetAside" type="number" class="form-control" min="0" step="any" inputmode="decimal" placeholder="0"
+                       @bind="Inputs.SetAside" />
+            </div>
+            <div class="form-text">
+                Money left in the prize pool for whoever goes on to win. The rest is split now, by ICM.
+            </div>
+        </div>
+    </div>
+
+    @if (calc.Error is not null)
+    {
+        <div class="alert alert-warning">@calc.Error</div>
+    }
+    else if (calc.Prompt is not null)
+    {
+        <div class="alert alert-info">@calc.Prompt</div>
+    }
+    else
+    {
+        @foreach (var warning in calc.Warnings)
+        {
+            <div class="alert alert-secondary py-2 small">@warning</div>
+        }
+
+        <div class="card mb-3">
+            <div class="card-header">ICM equity</div>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th>Player</th>
+                            <th class="text-end">Chips</th>
+                            <th class="text-end">Equity</th>
+                            @if (calc.SetAside > 0)
+                            {
+                                <th class="text-end">Deal</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in calc.Players)
+                        {
+                            <tr>
+                                <td class="icm-name">@p.Name</td>
+                                <td class="text-end">
+                                    @Format.Percent(p.ChipShare)
+                                    <div class="text-muted small">@Chips(p.Stack)</div>
+                                </td>
+                                <td class="text-end">@Money(p.Equity)</td>
+                                @if (calc.SetAside > 0)
+                                {
+                                    <td class="text-end fw-semibold">@Money(p.Deal)</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr class="fw-semibold">
+                            <td>Total</td>
+                            <td class="text-end">@Chips(calc.Players.Sum(p => p.Stack))</td>
+                            <td class="text-end">@Money(calc.Players.Sum(p => p.Equity))</td>
+                            @if (calc.SetAside > 0)
+                            {
+                                <td class="text-end">@Money(calc.Players.Sum(p => p.Deal))</td>
+                            }
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            @if (calc.SetAside > 0)
+            {
+                <div class="card-body border-top text-muted small">
+                    <strong>Deal</strong> is each player's fair payout now, with
+                    @Money(calc.SetAside) set aside for the winner. A player's chance of
+                    winning it is their chip share, so Deal + chip share × @Money(calc.SetAside)
+                    equals their equity.
+                </div>
+            }
+        </div>
+
+        @if (calc.HasAlternate)
+        {
+            var alternateDifference = calc.Players.Sum(p => p.Alternate!.Value - p.Equity);
+
+            <div class="card mb-3">
+                <div class="card-header">Alternate payouts</div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th>Player</th>
+                                <th class="text-end">Current</th>
+                                <th class="text-end">Alternate</th>
+                                <th class="text-end">Change</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in calc.Players)
+                            {
+                                var change = p.Alternate!.Value - p.Equity;
+                                <tr>
+                                    <td class="icm-name">@p.Name</td>
+                                    <td class="text-end">@Money(p.Equity)</td>
+                                    <td class="text-end">@Money(p.Alternate.Value)</td>
+                                    <td class="text-end fw-semibold @Format.SignClass(RoundedCents(change))">
+                                        @SignedMoney(change)
+                                        @if (p.Equity > 0)
+                                        {
+                                            <div class="small fw-normal">@SignedPercent((double)(change / p.Equity))</div>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr class="fw-semibold">
+                                <td>Total</td>
+                                <td class="text-end">@Money(calc.Players.Sum(p => p.Equity))</td>
+                                <td class="text-end">@Money(calc.Players.Sum(p => p.Alternate!.Value))</td>
+                                <td class="text-end @Format.SignClass(RoundedCents(alternateDifference))">@SignedMoney(alternateDifference)</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <div class="card-body border-top text-muted small">
+                    Change is each player's ICM equity under the alternate payouts minus their
+                    equity under the current ones: positive means better off.
+                    @if (RoundedCents(alternateDifference) != 0)
+                    {
+                        <text> The alternate structure pays @Money(Math.Abs(alternateDifference))
+                        @(alternateDifference > 0 ? "more" : "less") in total, so the changes don't sum to zero.</text>
+                    }
+                </div>
+            </div>
+        }
+    }
+}
+
+@code {
+    private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+
+    private bool allowed;
+    private bool notAuthorized;
+    private bool loadError;
+
+    protected override Task OnInitializedAsync() => CheckAccessAsync();
+
+    private async Task CheckAccessAsync()
+    {
+        notAuthorized = false;
+        loadError = false;
+        try
+        {
+            await Access.EnsureAllowedAsync();
+            allowed = true;
+        }
+        catch (NotAuthorizedException)
+        {
+            notAuthorized = true;
+        }
+        catch
+        {
+            loadError = true;
+        }
+    }
+
+    private int SeatCount => Inputs.Stacks.Count(s => s > 0);
+
+    private decimal TotalChips => Inputs.Stacks.Where(s => s > 0).Sum(s => s!.Value);
+
+    private sealed record PlayerResult(string Name, decimal Stack, double ChipShare, decimal Equity, decimal Deal, decimal? Alternate);
+
+    private sealed class Calculation
+    {
+        public string? Error { get; init; }
+        public string? Prompt { get; init; }
+        public List<PlayerResult> Players { get; } = new();
+        public List<string> Warnings { get; } = new();
+        public decimal SetAside { get; init; }
+        public bool HasAlternate { get; init; }
+    }
+
+    /// <summary>
+    /// Runs ICM over the occupied seats. Cheap enough (9 players is a few
+    /// thousand steps) to redo on every render, so results always match the inputs.
+    /// </summary>
+    private Calculation Calculate()
+    {
+        var amounts = Inputs.Stacks.Concat(Inputs.Prizes).Append(Inputs.SetAside);
+        if (Inputs.CompareAlternate)
+        {
+            amounts = amounts.Concat(Inputs.AlternatePrizes);
+        }
+        if (amounts.Any(a => a < 0))
+        {
+            return new Calculation { Error = "Chip stacks and amounts can't be negative." };
+        }
+
+        var seats = Enumerable.Range(0, IcmCalculator.MaxPlayers).Where(i => Inputs.Stacks[i] > 0).ToList();
+        var prizes = Inputs.Prizes.Select(p => p ?? 0m).ToArray();
+        var alternatePrizes = Inputs.AlternatePrizes.Select(p => p ?? 0m).ToArray();
+        var setAside = Inputs.SetAside ?? 0m;
+
+        if (seats.Count < 2)
+        {
+            return new Calculation { Prompt = "Enter at least two chip stacks to see each player's ICM equity." };
+        }
+        if (prizes.All(p => p == 0))
+        {
+            return new Calculation { Prompt = "Enter the prize for each paid place, starting with 1st." };
+        }
+        if (setAside > prizes[0])
+        {
+            return new Calculation { Error = $"The amount set aside can't be more than the 1st-place prize ({Money(prizes[0])})." };
+        }
+
+        var hasAlternate = Inputs.CompareAlternate && alternatePrizes.Any(p => p > 0);
+        var calc = new Calculation { SetAside = setAside, HasAlternate = hasAlternate };
+
+        // Places beyond the number of players left can't be reached (those
+        // prizes were already paid to players who busted).
+        var n = seats.Count;
+        if (prizes.Skip(n).Any(p => p > 0) || (hasAlternate && alternatePrizes.Skip(n).Any(p => p > 0)))
+        {
+            calc.Warnings.Add($"Only {n} players have chips, so prizes from {Ordinal(n + 1)} place down are ignored.");
+        }
+
+        var stacks = seats.Select(i => Inputs.Stacks[i]!.Value).ToArray();
+        var total = stacks.Sum();
+        var probabilities = IcmCalculator.FinishProbabilities(stacks, prizes.Length);
+        var equities = IcmCalculator.Equities(probabilities, prizes);
+        var deals = IcmCalculator.DealPayouts(probabilities, prizes, setAside);
+        var alternates = hasAlternate ? IcmCalculator.Equities(probabilities, alternatePrizes) : null;
+
+        for (var j = 0; j < n; j++)
+        {
+            calc.Players.Add(new PlayerResult(
+                DefaultName(seats[j], Inputs.Names[seats[j]]),
+                stacks[j],
+                (double)(stacks[j] / total),
+                equities[j],
+                deals[j],
+                alternates?[j]));
+        }
+
+        return calc;
+    }
+
+    private static string DefaultName(int seat, string? name = null) =>
+        string.IsNullOrWhiteSpace(name) ? $"Player {seat + 1}" : name.Trim();
+
+    private static string Ordinal(int place) => place switch
+    {
+        1 => "1st",
+        2 => "2nd",
+        3 => "3rd",
+        _ => $"{place}th",
+    };
+
+    private string Money(decimal value) => Format.Money2(value, Inputs.Currency);
+
+    private string SignedMoney(decimal value) =>
+        (RoundedCents(value) > 0 ? "+" : "") + Format.Money2(RoundedCents(value), Inputs.Currency);
+
+    private static string SignedPercent(double value)
+    {
+        // Round to the displayed 0.1% first; adding 0 turns -0.0 into 0 so it
+        // doesn't print as "-0.0 %".
+        var rounded = Math.Round(value, 3) + 0d;
+        return (rounded > 0 ? "+" : "") + Format.Percent(rounded);
+    }
+
+    // ICM runs in floating point, so a "no change" can come out as -0.0000001;
+    // compare and sign on the displayed (cent) value.
+    private static decimal RoundedCents(decimal value) => Math.Round(value, 2);
+
+    private static string Chips(decimal value) => value.ToString("#,##0.##", Inv);
+}

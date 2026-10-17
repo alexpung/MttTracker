@@ -35,6 +35,20 @@ h1:focus {
     margin-bottom: 0.15rem;
 }
 
+/* ICM calculator: fixed-width place labels so the prize inputs line up, and
+   player names that truncate instead of widening the results tables. */
+.icm-place {
+    min-width: 3.4rem;
+    justify-content: center;
+}
+
+.icm-name {
+    max-width: 8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* ---------- Mobile-first shell (optimised for iPhone) ---------- */
 
 :root {

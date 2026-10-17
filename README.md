@@ -34,6 +34,11 @@ same app, different storage backend:
   streak, worst no-cash streak, an interactive cumulative P&L chart (hover for
   the date, running total, and that tournament's result), and a by-year
   breakdown, all expressed in your home currency.
+- **ICM calculator** — enter up to 9 chip stacks and 9 place prizes to get each
+  player's Independent Chip Model (Malmuth-Harville) equity. For deal-making,
+  **set aside** an amount for the eventual winner and see everyone's fair
+  payout now; or enter an **alternate payout structure** to see how much better
+  or worse off each player is under it. Inputs are kept while you switch tabs.
 - **Export / import as JSON.** One tap downloads all your tournaments as a JSON
   file; importing merges a file back in (entries with a known id are updated,
   the rest are added). Works in both storage modes, so it doubles as the
@@ -88,7 +93,7 @@ there is no login flow.
 |-----------|------------|-------|
 | `Client/` | Blazor WebAssembly UI | Served as static files; calls `/api/*` **or** localStorage depending on the `Storage` setting. Fetches FX rates directly from Frankfurter. |
 | `Api/`    | Azure Functions (.NET isolated) | CRUD over Cosmos; enforces the single-user allowlist. Not deployed in browser-storage mode. |
-| `Shared/` | Class library | `TournamentEntry`, `StatsCalculator`, `Currencies`, `Format` — shared by Client and Api. |
+| `Shared/` | Class library | `TournamentEntry`, `StatsCalculator`, `IcmCalculator`, `Currencies`, `Format` — shared by Client and Api. |
 
 ### Why an API at all?
 
@@ -115,6 +120,12 @@ your instance private:
    allowlist (`AllowedUserDetails` = your GitHub username, and/or `AllowedUserId`).
    This is the real security boundary — set it, or the API fails closed and
    rejects everyone.
+
+The ICM calculator runs entirely in the browser, so it never touches your data.
+It sits behind the same GitHub login, and before showing it the page asks the
+API (`GET /api/access`) whether you're on the allowlist, so another GitHub
+account that signs in gets the same "Not authorized" message as on the other
+pages.
 
 ## Data model
 
