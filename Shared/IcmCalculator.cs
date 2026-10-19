@@ -97,22 +97,32 @@ public static class IcmCalculator
     }
 
     /// <summary>
-    /// Fair deal payouts when <paramref name="setAside"/> is left in the prize
-    /// pool for the eventual winner and the rest is paid out now. Each player
-    /// gives up their ICM share of the set-aside - their chance of winning
-    /// (their chip share) times the amount - which is the same as running ICM
-    /// with the set-aside taken off 1st place. The payouts sum to the prize
-    /// pool minus <paramref name="setAside"/>.
+    /// The prizes still played for after a deal that leaves
+    /// <paramref name="playForShare"/> (0 to 1) of every prize in the pool -
+    /// the same payout structure, scaled down (a partial chop) - plus
+    /// <paramref name="setAside"/> for the winner on top of their share.
     /// </summary>
-    public static decimal[] DealPayouts(double[,] probabilities, IReadOnlyList<decimal> prizes, decimal setAside)
+    public static decimal[] PlayedFor(IReadOnlyList<decimal> prizes, decimal playForShare, decimal setAside)
     {
-        if (prizes.Count == 0)
+        var playedFor = prizes.Select(p => p * playForShare).ToArray();
+        if (playedFor.Length > 0)
         {
-            return Equities(probabilities, prizes);
+            playedFor[0] += setAside;
         }
+        return playedFor;
+    }
 
-        var reduced = prizes.ToArray();
-        reduced[0] -= setAside;
-        return Equities(probabilities, reduced);
+    /// <summary>
+    /// Fair deal payouts when <paramref name="playedFor"/> (see
+    /// <see cref="PlayedFor"/>) stays in the pool and the rest is paid out
+    /// now: each player's equity minus their ICM equity in what's still played
+    /// for. ICM is linear in the prizes, so that's ICM run on the money being
+    /// split, <c>prizes[k] - playedFor[k]</c>. For money set aside for the
+    /// winner alone, a player's share of it is just their chip share.
+    /// </summary>
+    public static decimal[] DealPayouts(double[,] probabilities, IReadOnlyList<decimal> prizes, IReadOnlyList<decimal> playedFor)
+    {
+        var split = prizes.Select((p, k) => p - (k < playedFor.Count ? playedFor[k] : 0m)).ToArray();
+        return Equities(probabilities, split);
     }
 }

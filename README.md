@@ -36,9 +36,11 @@ same app, different storage backend:
   breakdown, all expressed in your home currency.
 - **ICM calculator** — enter up to 9 chip stacks and 9 place prizes to get each
   player's Independent Chip Model (Malmuth-Harville) equity. For deal-making,
-  **set aside** an amount for the eventual winner and see everyone's fair
-  payout now; or enter an **alternate payout structure** to see how much better
-  or worse off each player is under it. Inputs are kept while you switch tabs.
+  do a **partial chop** (e.g. split 50% of every prize now and play for the
+  other 50% with the same structure) and/or **set aside** an amount for the
+  eventual winner, and see everyone's fair payout now; or enter an
+  **alternate payout structure** to see how much better or worse off each
+  player is under it. Inputs are kept while you switch tabs.
 - **Export / import as JSON.** One tap downloads all your tournaments as a JSON
   file; importing merges a file back in (entries with a known id are updated,
   the rest are added). Works in both storage modes, so it doubles as the

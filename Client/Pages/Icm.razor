@@ -117,6 +117,22 @@ else
     <div class="card mb-3">
         <div class="card-header">Deal</div>
         <div class="card-body">
+            <p class="text-muted small">
+                Leave some prize money to play for; the rest is split now, by ICM.
+                Leave both blank for a full chop.
+            </p>
+
+            <label class="form-label" for="icmPlayFor">Play for a share of each prize</label>
+            <div class="input-group">
+                <input id="icmPlayFor" type="number" class="form-control" min="0" max="100" step="any" inputmode="decimal" placeholder="0"
+                       @bind="Inputs.PlayForPercent" />
+                <span class="input-group-text">%</span>
+            </div>
+            <div class="form-text mb-3">
+                A partial chop: 50 splits half of every prize now and plays for the
+                other half with the same payout structure.
+            </div>
+
             <label class="form-label" for="icmSetAside">Set aside for the winner</label>
             <div class="input-group">
                 <span class="input-group-text">@Currencies.Symbol(Inputs.Currency).Trim()</span>
@@ -124,7 +140,7 @@ else
                        @bind="Inputs.SetAside" />
             </div>
             <div class="form-text">
-                Money left in the prize pool for whoever goes on to win. The rest is split now, by ICM.
+                Taken from the money being split now; only the eventual winner gets it.
             </div>
         </div>
     </div>
@@ -153,7 +169,7 @@ else
                             <th>Player</th>
                             <th class="text-end">Chips</th>
                             <th class="text-end">Equity</th>
-                            @if (calc.SetAside > 0)
+                            @if (calc.HasDeal)
                             {
                                 <th class="text-end">Deal</th>
                             }
@@ -169,7 +185,7 @@ else
                                     <div class="text-muted small">@Chips(p.Stack)</div>
                                 </td>
                                 <td class="text-end">@Money(p.Equity)</td>
-                                @if (calc.SetAside > 0)
+                                @if (calc.HasDeal)
                                 {
                                     <td class="text-end fw-semibold">@Money(p.Deal)</td>
                                 }
@@ -181,7 +197,7 @@ else
                             <td>Total</td>
                             <td class="text-end">@Chips(calc.Players.Sum(p => p.Stack))</td>
                             <td class="text-end">@Money(calc.Players.Sum(p => p.Equity))</td>
-                            @if (calc.SetAside > 0)
+                            @if (calc.HasDeal)
                             {
                                 <td class="text-end">@Money(calc.Players.Sum(p => p.Deal))</td>
                             }
@@ -189,13 +205,18 @@ else
                     </tfoot>
                 </table>
             </div>
-            @if (calc.SetAside > 0)
+            @if (calc.HasDeal)
             {
                 <div class="card-body border-top text-muted small">
-                    <strong>Deal</strong> is each player's fair payout now, with
-                    @Money(calc.SetAside) set aside for the winner. A player's chance of
-                    winning it is their chip share, so Deal + chip share × @Money(calc.SetAside)
-                    equals their equity.
+                    <div class="mb-1">
+                        <strong>Still to play for:</strong>
+                        @string.Join(" · ", calc.PlayedFor
+                            .Select((amount, k) => (amount, k))
+                            .Where(x => x.amount > 0)
+                            .Select(x => $"{Ordinal(x.k + 1)} {Money(x.amount)}"))
+                    </div>
+                    <strong>Deal</strong> is each player's fair payout now: their equity minus
+                    their ICM equity in what's still to play for.
                 </div>
             }
         </div>
@@ -298,7 +319,9 @@ else
         public string? Prompt { get; init; }
         public List<PlayerResult> Players { get; } = new();
         public List<string> Warnings { get; } = new();
-        public decimal SetAside { get; init; }
+        // The prizes left to play for after the deal, one per reachable place.
+        public decimal[] PlayedFor { get; init; } = Array.Empty<decimal>();
+        public bool HasDeal => PlayedFor.Any(p => p > 0);
         public bool HasAlternate { get; init; }
     }
 
@@ -308,7 +331,7 @@ else
     /// </summary>
     private Calculation Calculate()
     {
-        var amounts = Inputs.Stacks.Concat(Inputs.Prizes).Append(Inputs.SetAside);
+        var amounts = Inputs.Stacks.Concat(Inputs.Prizes).Append(Inputs.PlayForPercent).Append(Inputs.SetAside);
         if (Inputs.CompareAlternate)
         {
             amounts = amounts.Concat(Inputs.AlternatePrizes);
@@ -321,6 +344,7 @@ else
         var seats = Enumerable.Range(0, IcmCalculator.MaxPlayers).Where(i => Inputs.Stacks[i] > 0).ToList();
         var prizes = Inputs.Prizes.Select(p => p ?? 0m).ToArray();
         var alternatePrizes = Inputs.AlternatePrizes.Select(p => p ?? 0m).ToArray();
+        var playForShare = (Inputs.PlayForPercent ?? 0m) / 100m;
         var setAside = Inputs.SetAside ?? 0m;
 
         if (seats.Count < 2)
@@ -331,17 +355,25 @@ else
         {
             return new Calculation { Prompt = "Enter the prize for each paid place, starting with 1st." };
         }
-        if (setAside > prizes[0])
+        if (playForShare > 1)
         {
-            return new Calculation { Error = $"The amount set aside can't be more than the 1st-place prize ({Money(prizes[0])})." };
+            return new Calculation { Error = "You can play for at most 100% of each prize." };
         }
 
+        // The set-aside comes out of the 1st-place money being split now.
+        var firstSplit = prizes[0] * (1 - playForShare);
+        if (setAside > firstSplit)
+        {
+            return new Calculation { Error = $"The amount set aside can't be more than the 1st-place prize money being split now ({Money(firstSplit)})." };
+        }
+
+        var n = seats.Count;
+        var playedFor = IcmCalculator.PlayedFor(prizes, playForShare, setAside);
         var hasAlternate = Inputs.CompareAlternate && alternatePrizes.Any(p => p > 0);
-        var calc = new Calculation { SetAside = setAside, HasAlternate = hasAlternate };
+        var calc = new Calculation { PlayedFor = playedFor.Take(n).ToArray(), HasAlternate = hasAlternate };
 
         // Places beyond the number of players left can't be reached (those
         // prizes were already paid to players who busted).
-        var n = seats.Count;
         if (prizes.Skip(n).Any(p => p > 0) || (hasAlternate && alternatePrizes.Skip(n).Any(p => p > 0)))
         {
             calc.Warnings.Add($"Only {n} players have chips, so prizes from {Ordinal(n + 1)} place down are ignored.");
@@ -351,7 +383,7 @@ else
         var total = stacks.Sum();
         var probabilities = IcmCalculator.FinishProbabilities(stacks, prizes.Length);
         var equities = IcmCalculator.Equities(probabilities, prizes);
-        var deals = IcmCalculator.DealPayouts(probabilities, prizes, setAside);
+        var deals = IcmCalculator.DealPayouts(probabilities, prizes, playedFor);
         var alternates = hasAlternate ? IcmCalculator.Equities(probabilities, alternatePrizes) : null;
 
         for (var j = 0; j < n; j++)
