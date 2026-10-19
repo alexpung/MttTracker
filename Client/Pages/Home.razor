@@ -59,27 +59,29 @@ else
     <div class="card">
         <div class="card-header">Profit by year</div>
         <div class="table-responsive">
-            <table class="table table-striped mb-0">
+            <table class="table table-striped mb-0 align-middle table-fit">
                 <thead>
                     <tr>
-                        <th>Year</th>
-                        <th class="text-end">Entries</th>
+                        <th class="fill-col">Year</th>
                         <th class="text-end">Buy-in</th>
                         <th class="text-end">Cashes</th>
                         <th class="text-end">Profit</th>
-                        <th class="text-end">ROI</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var y in stats.ByYear)
                     {
                         <tr>
-                            <td>@y.Year</td>
-                            <td class="text-end">@y.Entries</td>
+                            <td class="fill-col">
+                                <div>@y.Year</div>
+                                <div class="text-truncate text-muted small">@y.Entries @(y.Entries == 1 ? "entry" : "entries")</div>
+                            </td>
                             <td class="text-end">@Format.Money(y.Buyin)</td>
                             <td class="text-end">@Format.Money(y.Cashes)</td>
-                            <td class="text-end @Format.SignClass(y.Profit)">@Format.Money(y.Profit)</td>
-                            <td class="text-end @Format.SignClass((decimal)y.Roi)">@Format.Percent(y.Roi)</td>
+                            <td class="text-end @Format.SignClass(y.Profit)">
+                                @Format.Money(y.Profit)
+                                <div class="small">@Format.Percent(y.Roi) ROI</div>
+                            </td>
                         </tr>
                     }
                 </tbody>
