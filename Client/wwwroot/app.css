@@ -35,18 +35,28 @@ h1:focus {
     margin-bottom: 0.15rem;
 }
 
-/* ICM calculator: fixed-width place labels so the prize inputs line up, and
-   player names that truncate instead of widening the results tables. */
+/* ICM calculator: fixed-width place labels so the prize inputs line up. */
 .icm-place {
     min-width: 3.4rem;
     justify-content: center;
 }
 
-.icm-name {
-    max-width: 8rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
+/* Tables sized to fit a phone without scrolling sideways: amounts never wrap
+   or get cut off, and the .fill-col column takes whatever width they leave -
+   max-width: 0 stops its content (e.g. a long player name) from widening the
+   table, and its .text-truncate lines end in an ellipsis instead. */
+.table-fit {
+    font-size: .875rem;
+}
+
+.table-fit th,
+.table-fit td {
     white-space: nowrap;
+}
+
+.table-fit .fill-col {
+    width: 100%;
+    max-width: 0;
 }
 
 /* ---------- Mobile-first shell (optimised for iPhone) ---------- */

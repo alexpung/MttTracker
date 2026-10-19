@@ -163,11 +163,10 @@ else
         <div class="card mb-3">
             <div class="card-header">ICM equity</div>
             <div class="table-responsive">
-                <table class="table table-sm table-striped mb-0 align-middle">
+                <table class="table table-sm table-striped mb-0 align-middle table-fit">
                     <thead>
                         <tr>
-                            <th>Player</th>
-                            <th class="text-end">Chips</th>
+                            <th class="fill-col">Player</th>
                             <th class="text-end">Equity</th>
                             @if (calc.HasDeal)
                             {
@@ -179,10 +178,9 @@ else
                         @foreach (var p in calc.Players)
                         {
                             <tr>
-                                <td class="icm-name">@p.Name</td>
-                                <td class="text-end">
-                                    @Format.Percent(p.ChipShare)
-                                    <div class="text-muted small">@Chips(p.Stack)</div>
+                                <td class="fill-col">
+                                    <div class="text-truncate">@p.Name</div>
+                                    <div class="text-truncate text-muted small">@Format.Percent(p.ChipShare) · @Chips(p.Stack)</div>
                                 </td>
                                 <td class="text-end">@Money(p.Equity)</td>
                                 @if (calc.HasDeal)
@@ -194,8 +192,10 @@ else
                     </tbody>
                     <tfoot>
                         <tr class="fw-semibold">
-                            <td>Total</td>
-                            <td class="text-end">@Chips(calc.Players.Sum(p => p.Stack))</td>
+                            <td class="fill-col">
+                                <div>Total</div>
+                                <div class="text-truncate text-muted small fw-normal">@Chips(calc.Players.Sum(p => p.Stack)) chips</div>
+                            </td>
                             <td class="text-end">@Money(calc.Players.Sum(p => p.Equity))</td>
                             @if (calc.HasDeal)
                             {
@@ -228,11 +228,10 @@ else
             <div class="card mb-3">
                 <div class="card-header">Alternate payouts</div>
                 <div class="table-responsive">
-                    <table class="table table-sm table-striped mb-0 align-middle">
+                    <table class="table table-sm table-striped mb-0 align-middle table-fit">
                         <thead>
                             <tr>
-                                <th>Player</th>
-                                <th class="text-end">Current</th>
+                                <th class="fill-col">Player</th>
                                 <th class="text-end">Alternate</th>
                                 <th class="text-end">Change</th>
                             </tr>
@@ -242,9 +241,11 @@ else
                             {
                                 var change = p.Alternate!.Value - p.Equity;
                                 <tr>
-                                    <td class="icm-name">@p.Name</td>
-                                    <td class="text-end">@Money(p.Equity)</td>
-                                    <td class="text-end">@Money(p.Alternate.Value)</td>
+                                    <td class="fill-col"><div class="text-truncate">@p.Name</div></td>
+                                    <td class="text-end">
+                                        @Money(p.Alternate.Value)
+                                        <div class="text-muted small">was @Money(p.Equity)</div>
+                                    </td>
                                     <td class="text-end fw-semibold @Format.SignClass(RoundedCents(change))">
                                         @SignedMoney(change)
                                         @if (p.Equity > 0)
@@ -257,9 +258,11 @@ else
                         </tbody>
                         <tfoot>
                             <tr class="fw-semibold">
-                                <td>Total</td>
-                                <td class="text-end">@Money(calc.Players.Sum(p => p.Equity))</td>
-                                <td class="text-end">@Money(calc.Players.Sum(p => p.Alternate!.Value))</td>
+                                <td class="fill-col">Total</td>
+                                <td class="text-end">
+                                    @Money(calc.Players.Sum(p => p.Alternate!.Value))
+                                    <div class="text-muted small fw-normal">was @Money(calc.Players.Sum(p => p.Equity))</div>
+                                </td>
                                 <td class="text-end @Format.SignClass(RoundedCents(alternateDifference))">@SignedMoney(alternateDifference)</td>
                             </tr>
                         </tfoot>
@@ -267,7 +270,7 @@ else
                 </div>
                 <div class="card-body border-top text-muted small">
                     Change is each player's ICM equity under the alternate payouts minus their
-                    equity under the current ones: positive means better off.
+                    equity under the current ones ("was"): positive means better off.
                     @if (RoundedCents(alternateDifference) != 0)
                     {
                         <text> The alternate structure pays @Money(Math.Abs(alternateDifference))
