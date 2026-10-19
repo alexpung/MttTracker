@@ -20,6 +20,9 @@ public sealed class IcmInputs
 
     public bool CompareAlternate { get; set; }
 
+    /// <summary>Partial chop: the percentage of every prize left to play for.</summary>
+    public decimal? PlayForPercent { get; set; }
+
     public decimal? SetAside { get; set; }
 
     public string Currency { get; set; } = Currencies.Home;
@@ -31,6 +34,7 @@ public sealed class IcmInputs
         Array.Clear(Prizes);
         Array.Clear(AlternatePrizes);
         CompareAlternate = false;
+        PlayForPercent = null;
         SetAside = null;
     }
 }
