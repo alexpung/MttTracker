@@ -16,7 +16,14 @@ public sealed class SwaAuthenticationStateProvider(HttpClient http) : Authentica
     private static readonly AuthenticationState Anonymous =
         new(new ClaimsPrincipal(new ClaimsIdentity()));
 
-    public override async Task<AuthenticationState> GetAuthenticationStateAsync()
+    // The signed-in state is asked for more than once per page load; only a
+    // successful answer is remembered, so a failed lookup is tried again.
+    private Task<AuthenticationState>? _signedIn;
+
+    public override Task<AuthenticationState> GetAuthenticationStateAsync() =>
+        _signedIn ?? LoadAsync();
+
+    private async Task<AuthenticationState> LoadAsync()
     {
         try
         {
@@ -35,7 +42,9 @@ public sealed class SwaAuthenticationStateProvider(HttpClient http) : Authentica
             claims.AddRange(principal.UserRoles.Select(r => new Claim(ClaimTypes.Role, r)));
 
             var identity = new ClaimsIdentity(claims, authenticationType: "swa");
-            return new AuthenticationState(new ClaimsPrincipal(identity));
+            var state = new AuthenticationState(new ClaimsPrincipal(identity));
+            _signedIn = Task.FromResult(state);
+            return state;
         }
         catch
         {
@@ -44,7 +53,11 @@ public sealed class SwaAuthenticationStateProvider(HttpClient http) : Authentica
     }
 
     /// <summary>Re-query <c>/.auth/me</c>, e.g. after returning from a login redirect.</summary>
-    public void Reload() => NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
+    public void Reload()
+    {
+        _signedIn = null;
+        NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
+    }
 
     private sealed class AuthMeResponse
     {

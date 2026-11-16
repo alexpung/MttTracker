@@ -9,6 +9,14 @@
     <a class="btn btn-primary" href="entries">Add tournament</a>
 </div>
 
+@if (refreshFailed)
+{
+    <div class="alert alert-warning">
+        Couldn't reach the server — showing the data saved on this device.
+        <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="ReloadAsync">Retry</button>
+    </div>
+}
+
 @if (notAuthorized)
 {
     <div class="alert alert-warning">
@@ -98,6 +106,7 @@ else
     private TournamentStats? stats;
     private bool notAuthorized;
     private bool loadError;
+    private bool refreshFailed;
 
     protected override Task OnInitializedAsync() => ReloadAsync();
 
@@ -105,18 +114,26 @@ else
     {
         notAuthorized = false;
         loadError = false;
-        stats = null;
+        refreshFailed = false;
         try
         {
-            stats = await Tournaments.GetStatsAsync();
+            // Show the last-loaded copy at once, then swap in the server's.
+            if (stats is null && await Tournaments.GetCachedEntriesAsync() is { } cached)
+            {
+                stats = StatsCalculator.ComputeStats(cached);
+                StateHasChanged();
+            }
+            stats = StatsCalculator.ComputeStats(await Tournaments.GetEntriesAsync());
         }
         catch (NotAuthorizedException)
         {
             notAuthorized = true;
+            stats = null;
         }
         catch
         {
-            loadError = true;
+            loadError = stats is null;
+            refreshFailed = !loadError;
         }
     }
 

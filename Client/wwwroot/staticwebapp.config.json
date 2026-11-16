@@ -17,6 +17,16 @@
     { "route": "/.auth/login/facebook", "statusCode": 404 },
     { "route": "/logged-out.html", "allowedRoles": ["anonymous", "authenticated"] },
     { "route": "/api/*", "allowedRoles": ["authenticated"] },
+    {
+      "route": "/_framework/*.{wasm,dat}",
+      "allowedRoles": ["authenticated"],
+      "headers": { "cache-control": "max-age=31536000, immutable" }
+    },
+    {
+      "route": "/_framework/*",
+      "allowedRoles": ["authenticated"],
+      "headers": { "cache-control": "no-cache" }
+    },
     { "route": "/*", "allowedRoles": ["authenticated"] }
   ],
   "responseOverrides": {
