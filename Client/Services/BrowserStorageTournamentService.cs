@@ -63,12 +63,6 @@ public sealed class BrowserStorageTournamentService(IJSRuntime js) : ITournament
         }
     }
 
-    public async Task<TournamentStats> GetStatsAsync()
-    {
-        var entries = await GetEntriesAsync();
-        return StatsCalculator.ComputeStats(entries);
-    }
-
     public async Task<ImportResult> ImportAsync(IReadOnlyList<TournamentEntry> imported)
     {
         var entries = await LoadAsync();

@@ -27,6 +27,11 @@
             (or open this app in a private window), then sign in above.
         </div>
     </main>
+
+    <script>
+        // Signing out also drops the copy of the tournaments saved on this device.
+        try { localStorage.removeItem("mtttracker.cache.entries"); } catch { }
+    </script>
 </body>
 
 </html>

@@ -14,6 +14,15 @@ public interface ITournamentService
 {
     Task<List<TournamentEntry>> GetEntriesAsync();
 
+    /// <summary>
+    /// The entries as last loaded, available without waiting on a server — or
+    /// null if there is no such copy. Pages show this straight away and then
+    /// replace it with <see cref="GetEntriesAsync"/>. Only a backend that is
+    /// slow to reach needs to provide one.
+    /// </summary>
+    Task<List<TournamentEntry>?> GetCachedEntriesAsync() =>
+        Task.FromResult<List<TournamentEntry>?>(null);
+
     /// <summary>Creates the entry and returns the stored copy (with its assigned id).</summary>
     Task<TournamentEntry> AddAsync(TournamentEntry entry);
 
@@ -21,8 +30,6 @@ public interface ITournamentService
     Task<TournamentEntry> UpdateAsync(TournamentEntry entry);
 
     Task DeleteAsync(string id);
-
-    Task<TournamentStats> GetStatsAsync();
 
     /// <summary>
     /// Merges entries from a JSON export into the store: an entry whose id is
